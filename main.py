@@ -351,25 +351,18 @@ class EchoPlugin(Star):
         tracker = self._trackers.get(group_id)
         if tracker and tracker.alive:
             if now > tracker.expire_at:
-                self.logger.info(f"[DEBUG] 群 {group_id} tracker过期, expire_at={tracker.expire_at}, now={now}")
                 self._cleanup_tracker(group_id)
             else:
                 tracker.expire_at = now + self._track_timeout()
                 tracker.collected.append(msg)
-                self.logger.info(f"[DEBUG] 群 {group_id} Route1: round={tracker.round}, max={self._max_rounds()}, analyzing={tracker.analyzing}, active_thinking={self._active_thinking}")
                 # 互斥检查：Route 1 或 Route 2 正在处理中则跳过
                 if tracker.analyzing or self._active_thinking:
-                    self.logger.info(f"[DEBUG] 群 {group_id} Route1 被互斥锁阻止: analyzing={tracker.analyzing}, active_thinking={self._active_thinking}")
                     return
                 if tracker.round >= self._max_rounds():
-                    self.logger.info(f"[DEBUG] 群 {group_id} Route1 达到最大轮数, cleanup")
                     self._cleanup_tracker(group_id)
                     return
                 # 回复概率命中？
-                prob = self._get_effective_reply_prob(event)
-                hit = self._is_probability_hit(prob)
-                self.logger.info(f"[DEBUG] 群 {group_id} Route1 概率检测: prob={prob}, hit={hit}")
-                if hit:
+                if self._is_probability_hit(self._get_effective_reply_prob(event)):
                     tracker.analyzing = True
                     asyncio.create_task(self._handle_reply(tracker))
                 return
