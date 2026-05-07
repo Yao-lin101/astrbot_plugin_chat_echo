@@ -73,7 +73,7 @@ class ConversationTracker:
         "group_id", "unified_msg_origin", "bot_message",
         "trigger_user_name", "trigger_user_id",
         "collected", "expire_at",
-        "analyzing", "round", "detection_count", "alive",
+        "analyzing", "round", "detection_count", "alive", "group_name",
     )
 
     def __init__(self, group_id: str, unified_msg_origin: str,
@@ -90,6 +90,8 @@ class ConversationTracker:
         self.round = 0
         self.detection_count = 0
         self.alive = True
+        # 群名（由 LLM 触发时填充）
+        self.group_name = ""
 
 
 @register("astrbot_plugin_chat_echo", "AMYdd00", "主动接话插件", "1.0.0")
@@ -254,12 +256,22 @@ class EchoPlugin(Star):
             return
         if group_id in self._trackers and self._trackers[group_id].alive:
             return
+        # 捕获群名
+        try:
+            gname = getattr(event, 'group_name', None) or ""
+        except Exception:
+            gname = ""
         tracker = ConversationTracker(
             group_id=group_id, unified_msg_origin=unified_msg_origin,
             bot_message=bot_message, trigger_user_name=sender_name,
             trigger_user_id=sender_id, expire_seconds=self._track_timeout(),
         )
+        if gname:
+            tracker.group_name = gname
         self._trackers[group_id] = tracker
+        # 存入 TokenCounter
+        if gname:
+            self.token_counter.set_group_name(group_id, gname)
 
     # ======================== 事件：LLM 回复后 ========================
 
@@ -329,14 +341,6 @@ class EchoPlugin(Star):
 
         group_id = str(event.get_group_id())
         now = time.time()
-
-        # 捕获群名
-        try:
-            gname = getattr(event, 'group_name', None) or getattr(event.get_sender(), 'group_name', None) or ""
-            if gname:
-                self.token_counter.set_group_name(group_id, gname)
-        except Exception:
-            pass
 
         # 跳过 Bot 自己
         try:
@@ -443,6 +447,13 @@ class EchoPlugin(Star):
     async def _handle_proactive(self, event: AstrMessageEvent, msg: dict):
         group_id = str(event.get_group_id())
         try:
+            # 捕获群名
+            try:
+                gname = getattr(event, 'group_name', None) or ""
+                if gname:
+                    self.token_counter.set_group_name(group_id, gname)
+            except Exception:
+                pass
             # 构建简短上下文（只有这一条消息+附近几条收集的消息）
             context_text = (
                 f"=== 群聊中的最新消息 ===\n"
