@@ -1,0 +1,139 @@
+{
+  "proactive_enabled": {
+    "type": "bool",
+    "description": "启用主动接话功能",
+    "hint": "开启后，Bot发出消息后会自动监听后续回复并尝试主动接话",
+    "default": false
+  },
+  "trigger_mode": {
+    "type": "string",
+    "description": "触发跟踪模式",
+    "hint": "llm_response: 仅在LLM回复后监听 | any_message: Bot发出任何消息后都监听",
+    "default": "llm_response",
+    "options": [
+      "llm_response",
+      "any_message"
+    ]
+  },
+  "analyzer_provider_id": {
+    "type": "string",
+    "description": "分析用LLM Provider",
+    "_special": "select_provider",
+    "default": "",
+    "hint": "用于判断群友消息的LLM（建议用便宜的模型）。留空则使用会话的默认Provider"
+  },
+  "generator_provider_id": {
+    "type": "string",
+    "description": "生成用LLM Provider",
+    "_special": "select_provider",
+    "default": "",
+    "hint": "用于生成主动回复内容的LLM（建议用质量高的模型）。留空则使用会话的默认Provider"
+  },
+  "track_timeout_seconds": {
+    "type": "int",
+    "description": "跟踪窗口(秒)",
+    "hint": "停止条件1：群聊沉默超过此秒数即停止本轮。与下方「最大检测次数」是「或」关系，任一先触发则完全停止",
+    "default": 120,
+    "slider": {
+      "min": 10,
+      "max": 600,
+      "step": 10
+    }
+  },
+  "max_detection_count": {
+    "type": "int",
+    "description": "最大检测次数",
+    "hint": "停止条件2：最多分析多少条群友发言，之后停止本轮。与上方「跟踪窗口」是「或」关系，任一先触发则完全停止",
+    "default": 10,
+    "slider": {
+      "min": 1,
+      "max": 50,
+      "step": 1
+    }
+  },
+  "reply_probability": {
+    "type": "int",
+    "description": "回复模式-分析概率(%)",
+    "hint": "Bot发言后，跟踪窗口内群友消息按此概率分析是否回复Bot。100=每条都分析，50=一半概率",
+    "default": 100,
+    "slider": {
+      "min": 0,
+      "max": 100,
+      "step": 5
+    }
+  },
+  "active_probability": {
+    "type": "int",
+    "description": "主动模式-参与概率(%)",
+    "hint": "Bot没发言时，随机抽取群消息按此概率分析话题并主动参与。0=关闭该模式",
+    "default": 0,
+    "slider": {
+      "min": 0,
+      "max": 100,
+      "step": 5
+    }
+  },
+  "active_interval_minutes": {
+    "type": "int",
+    "description": "主动模式-最小间隔(分钟)",
+    "hint": "主动参与的最小间隔，防止太频繁。例：30表示每30分钟最多主动参与一次",
+    "default": 30,
+    "slider": {
+      "min": 1,
+      "max": 480,
+      "step": 5
+    }
+  },
+  "enabled_groups": {
+    "type": "list",
+    "description": "群白名单(支持自定义概率)",
+    "hint": "只在这些群中启用。支持格式: \"群ID:回复概率:主动概率\"，如 \"-100123456:80:30\"。留空则所有群生效",
+    "default": []
+  },
+  "max_proactive_rounds": {
+    "type": "int",
+    "description": "最大连续主动回复轮数",
+    "hint": "最多连续主动回复几次，Bot回复后自动开启新一轮监听（1表示只接话一次不继续）",
+    "default": 3,
+    "slider": {
+      "min": 1,
+      "max": 10,
+      "step": 1
+    }
+  },
+  "proactive_cooldown_seconds": {
+    "type": "int",
+    "description": "主动发言冷却(秒)",
+    "hint": "每次主动发言后，等待多久才能再次在该群触发新的跟踪窗口",
+    "default": 300,
+    "slider": {
+      "min": 30,
+      "max": 3600,
+      "step": 30
+    }
+  },
+  "analyzer_system_prompt": {
+    "type": "text",
+    "description": "回复分析-提示词",
+    "hint": "用于判断群友消息是否在回复Bot的LLM提示词",
+    "default": "你是一个群聊对话分析师。请分析以下群聊上下文，判断最新的几条消息是否在回复机器人(Bot)。\n\n判断标准：\n1. 消息中直接@了Bot或提到了Bot的名字\n2. 消息内容明显是在回应Bot刚才说的内容\n3. 对话上下文表明对方是在跟Bot说话\n4. 如果消息是在跟其他人说话或闲聊，回复\"no\"\n5. 如果有些消息是回复Bot的但有些不是，回复\"partial\"并简要说明\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"is_reply_to_bot\": \"yes|no|partial\",\n  \"reason\": \"简短的原因说明\"\n}",
+    "editor_mode": true,
+    "editor_language": "markdown"
+  },
+  "proactive_analyzer_system_prompt": {
+    "type": "text",
+    "description": "主动分析-提示词",
+    "hint": "用于判断Bot是否应该主动参与讨论的LLM提示词",
+    "default": "你是一个群聊观察者。请分析以下群聊内容，判断Bot是否应该自然地参与讨论。\n\n判断标准：\n1. 群消息中提到的话题Bot是否了解或有见解\n2. 对话是否在邀请更多人参与（提问、征求意见等）\n3. Bot是否有一个自然的角度可以加入对话\n4. 如果Bot参与会显得突兀，回复\"no\"\n5. 如果Bot可以自然地接上话，回复\"yes\"\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"should_join\": \"yes|no\",\n  \"reason\": \"简短的原因说明\"\n}",
+    "editor_mode": true,
+    "editor_language": "markdown"
+  },
+  "generator_system_prompt": {
+    "type": "text",
+    "description": "回复生成-提示词",
+    "hint": "用于生成主动回复内容的LLM提示词",
+    "default": "你是一个活跃的群聊成员，正在参与群聊讨论。你的任务是自然地接上对话，表现得像一个真实的群友。\n\n要求：\n1. 回复要自然、口语化，不要太官方\n2. 结合Bot刚才说的内容以及群友的回复来回应\n3. 保持适度的个性，可以幽默风趣\n4. 字数控制在50字以内\n5. 不要使用表情符号或颜文字\n6. 不要标记自己是AI或机器人\n7. 回复要显得是对前面对话的自然延续",
+    "editor_mode": true,
+    "editor_language": "markdown"
+  }
+}

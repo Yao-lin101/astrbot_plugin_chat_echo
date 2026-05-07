@@ -1,0 +1,14 @@
+name: "astrbot_plugin_chat_echo"
+display_name: 主动接话插件
+author: "AMYdd00"
+description: "Bot发出消息后，自动分析后续群友回复并使用LLM主动接话"
+short_description: "智能群聊主动接话插件"
+version: "1.0.0"
+
+repo: "https://github.com/AMYdd00/astrbot_plugin_chat_echo"
+support_platforms:
+  - aiocqhttp
+  - telegram
+  - discord
+  - lark
+  - webchat

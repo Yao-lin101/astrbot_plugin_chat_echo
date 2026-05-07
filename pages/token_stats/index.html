@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Token 用量统计</title>
+<style>
+:root{--bg:#f5f5f7;--text:#1d1d1f;--text2:#86868b;--text3:#aeaeb2;--card:rgba(255,255,255,0.72);--card-border:rgba(255,255,255,0.8);--card-shadow:0 8px 40px rgba(0,0,0,0.08);--accent:#0071e3;--accent2:#5856d6;--gradient1:linear-gradient(135deg,#0071e3,#5856d6);--segment-bg:rgba(0,0,0,0.06);--segment-active:#fff;--segment-shadow:0 1px 3px rgba(0,0,0,0.1);--divider:rgba(0,0,0,0.06);--rank-bg:rgba(0,0,0,0.04);--rank-bar:linear-gradient(90deg,#0071e3,#5856d6);--tag-bg:rgba(0,113,227,0.08);--tag-text:#0071e3;--legend-bg:rgba(0,0,0,0.04)}
+html[data-theme="dark"]{--bg:#000;--text:#f5f5f7;--text2:#86868b;--text3:#48484a;--card:rgba(28,28,30,0.78);--card-border:rgba(255,255,255,0.06);--card-shadow:0 8px 40px rgba(0,0,0,0.4);--accent:#2997ff;--accent2:#5e5ce6;--gradient1:linear-gradient(135deg,#2997ff,#5e5ce6);--segment-bg:rgba(255,255,255,0.08);--segment-active:rgba(255,255,255,0.15);--segment-shadow:0 1px 3px rgba(0,0,0,0.3);--divider:rgba(255,255,255,0.06);--rank-bg:rgba(255,255,255,0.04);--rank-bar:linear-gradient(90deg,#2997ff,#5e5ce6);--tag-bg:rgba(41,151,255,0.12);--tag-text:#2997ff;--legend-bg:rgba(255,255,255,0.06)}
+*{box-sizing:border-box;margin:0;padding:0}html{-webkit-font-smoothing:antialiased}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .4s,color .4s}
+.bg-glow{position:fixed;top:-20%;left:-10%;width:60%;height:60%;background:radial-gradient(ellipse,rgba(0,113,227,0.06) 0%,transparent 70%);pointer-events:none;z-index:0}
+html[data-theme="dark"] .bg-glow{background:radial-gradient(ellipse,rgba(41,151,255,0.08) 0%,transparent 70%)}
+.container{max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+header{padding:60px 0 20px;text-align:center;opacity:0;transform:translateY(20px);animation:fadeUp .8s cubic-bezier(.22,1,.36,1) forwards}
+header .badge{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.05em;color:var(--tag-text);background:var(--tag-bg);padding:4px 14px;border-radius:20px;margin-bottom:16px;text-transform:uppercase}
+header h1{font-size:clamp(32px,5vw,56px);font-weight:700;letter-spacing:-.025em;line-height:1.1;background:var(--gradient1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+header .sub{font-size:18px;color:var(--text2)}
+.hero-card{margin:24px 0 32px;padding:40px 32px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:24px;box-shadow:var(--card-shadow);text-align:center;opacity:0;transform:translateY(30px);animation:fadeUp .8s .15s forwards}
+.hero-card .total-number{font-size:clamp(48px,8vw,80px);font-weight:700;letter-spacing:-.03em;line-height:1;background:var(--gradient1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.hero-card .total-label{font-size:16px;color:var(--text2);font-weight:500;margin-bottom:20px}
+.hero-card .meta-row{display:flex;justify-content:center;gap:32px;flex-wrap:wrap}
+.hero-card .meta-item{text-align:center}
+.hero-card .meta-item .num{font-size:20px;font-weight:600;color:var(--text)}
+.hero-card .meta-item .lb{font-size:13px;color:var(--text2);margin-top:2px}
+.segment-control{display:flex;justify-content:center;gap:4px;background:var(--segment-bg);border-radius:12px;padding:4px;margin:0 0 28px;width:fit-content;margin-left:auto;margin-right:auto;opacity:0;transform:translateY(20px);animation:fadeUp .8s .3s forwards}
+.segment-control .seg{padding:8px 20px;border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:500;border-radius:9px;cursor:pointer;transition:all .3s;font-family:inherit;outline:none}
+.segment-control .seg.active{background:var(--segment-active);color:var(--text);box-shadow:var(--segment-shadow)}
+.segment-control .seg:hover:not(.active){color:var(--text)}
+.chart-card{padding:28px 24px 20px;margin-bottom:24px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:24px;box-shadow:var(--card-shadow);opacity:0;transform:translateY(30px);transition:opacity .6s,transform .6s}
+.chart-card.visible{opacity:1;transform:translateY(0)}
+.chart-card h2{font-size:18px;font-weight:600;margin-bottom:12px}
+.chart-wrap{width:100%;overflow-x:auto}.chart-svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-bottom:14px;padding:10px 14px;background:var(--legend-bg);border-radius:12px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:opacity .3s;user-select:none}
+.legend-item .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.legend-item.hidden{opacity:.3;text-decoration:line-through}
+.rank-section{margin-bottom:24px}
+.rank-section h2{font-size:20px;font-weight:600;margin-bottom:16px;opacity:0;transform:translateY(20px)}
+.rank-section h2.visible{animation:fadeUp .6s forwards}
+.rank-list{display:flex;flex-direction:column;gap:8px}
+.rank-item{display:flex;align-items:center;gap:16px;padding:16px 20px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:16px;box-shadow:var(--card-shadow);transition:all .3s;opacity:0;transform:translateX(-20px);position:relative;overflow:hidden}
+.rank-item:hover{transform:translateX(4px)}.rank-item.visible{animation:slideIn .5s forwards}
+.rank-item .rank-num{width:32px;text-align:center;font-size:16px;font-weight:600;flex-shrink:0}
+.rank-item .rank-num.gold{color:#ff9500}.rank-item .rank-num.silver{color:#aeaeb2}.rank-item .rank-num.bronze{color:#cd7f32}
+.rank-item .rank-info{flex:1;min-width:0}
+.rank-item .rank-info .name{font-size:15px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-item .rank-info .detail{font-size:12px;color:var(--text2);margin-top:2px}
+.rank-item .rank-tokens{font-size:16px;font-weight:700;color:var(--accent);flex-shrink:0}
+.rank-item .rank-bar-bg{position:absolute;bottom:0;left:0;height:3px;background:var(--rank-bg);width:100%}
+.rank-item .rank-bar-fill{position:absolute;bottom:0;left:0;height:3px;background:var(--rank-bar);border-radius:0 2px 2px 0;transition:width 1s cubic-bezier(.22,1,.36,1)}
+.empty-state{text-align:center;padding:80px 20px;color:var(--text2);font-size:16px}
+.empty-state .icon{font-size:48px;margin-bottom:16px}
+.empty-state .hint{font-size:14px;color:var(--text3);margin-top:8px}
+@keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{to{opacity:1;transform:translateX(0)}}
+@media(max-width:680px){.container{padding:0 16px}header{padding:40px 0 16px}.hero-card{padding:28px 20px}.hero-card .meta-row{gap:16px}.segment-control .seg{padding:6px 14px;font-size:13px}.rank-item{padding:12px 16px;gap:12px}.rank-item .rank-tokens{font-size:14px}}
+</style></head>
+<body>
+<div class="bg-glow"></div>
+<div class="container">
+<header><div class="badge">LLM Analytics</div><h1>Token 用量统计</h1><div class="sub">主动接话插件 LLM 消耗追踪</div></header>
+<div class="hero-card">
+<div class="total-number" id="totalNum">—</div><div class="total-label">Total Tokens</div>
+<div class="meta-row">
+<div class="meta-item"><div class="num" id="promptTotal">—</div><div class="lb">Prompt</div></div>
+<div class="meta-item"><div class="num" id="compTotal">—</div><div class="lb">Completion</div></div>
+<div class="meta-item"><div class="num" id="groupCount">—</div><div class="lb">活跃群组</div></div>
+</div></div>
+<div class="segment-control">
+<button class="seg" data-period="day">今日</button>
+<button class="seg" data-period="week">本周</button>
+<button class="seg active" data-period="month">本月</button>
+<button class="seg" data-period="year">本年</button>
+<button class="seg" data-period="all">全部</button>
+</div>
+<div class="chart-card" id="chartCard">
+<h2>每日 Token 趋势（分群）</h2>
+<div class="legend" id="legend"></div>
+<div class="chart-wrap"><svg class="chart-svg" id="chart" viewBox="0 0 1000 320"></svg></div>
+</div>
+<div class="rank-section"><h2 id="rankTitle">群组 Token 排行</h2><div class="rank-list" id="rankList"></div></div>
+</div>
+<script type="module">
+const B=window.AstrBotPluginPage;
+if(!B){document.body.innerHTML='<div class="container"><div class="empty-state"><div class="icon">⚠️</div><div>Bridge not available</div></div></div>'}else{await B.ready();
+(function(){const m=window.matchMedia('(prefers-color-scheme:dark)');function s(d){document.documentElement.setAttribute('data-theme',d?'dark':'light')}s(m.matches);m.addEventListener('change',e=>s(e.matches))})();
+const PALETTE=['#0071e3','#ff2d55','#34c759','#ff9500','#5856d6','#ff6482','#00c7be','#af52de','#ffd60a','#30b0c7','#ff9f0a','#bf5af2','#64d2ff','#ff453a','#32d74b'];
+const $=s=>document.querySelector(s);const totalNum=$('#totalNum'),promptEl=$('#promptTotal'),compEl=$('#compTotal'),groupCnt=$('#groupCount'),chart=$('#chart'),legend=$('#legend'),rankList=$('#rankList'),segs=document.querySelectorAll('.seg');let curPeriod='month';const hiddenSet=new Set();
+function fmt(n){if(n==null)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e4)return(n/1e4).toFixed(1)+'万';return n.toLocaleString()}
+function fmtFull(n){if(n==null)return'0';return n.toLocaleString()}
+function drawChart(allGroups){if(!allGroups||!allGroups.length){chart.innerHTML='<text x="500" y="165" text-anchor="middle" fill="var(--text3)" font-size="14">暂无数据</text>';legend.innerHTML='';return}
+const W=1000,H=320,pad={top:16,right:16,bottom:36,left:52},cw=W-pad.left-pad.right,ch=H-pad.top-pad.bottom;let maxVal=0;const dateSet=new Set(),vis=allGroups.filter(g=>!hiddenSet.has(g.group_id));allGroups.forEach(g=>{g.daily.forEach(d=>{dateSet.add(d.date);if(!hiddenSet.has(g.group_id)&&d.total>maxVal)maxVal=d.total})});maxVal=Math.max(maxVal,1);let niceMax=Math.pow(10,Math.ceil(Math.log10(maxVal)));if(maxVal<=niceMax/2)niceMax/=2;const dates=[...dateSet].sort(),yTicks=4;let svg='<defs>';
+vis.forEach((g,i)=>{const c=PALETTE[i%PALETTE.length];svg+=`<linearGradient id="a${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${c}" stop-opacity="0.2"/><stop offset="100%" stop-color="${c}" stop-opacity="0.01"/></linearGradient>`});svg+='</defs>';
+const tc=getComputedStyle(document.documentElement).getPropertyValue('--text3').trim()||'#86868b';
+for(let i=0;i<=yTicks;i++){const v=(niceMax/yTicks)*i,y=pad.top+ch-(v/niceMax)*ch;svg+=`<line x1="${pad.left}" y1="${y}" x2="${pad.left+cw}" y2="${y}" stroke="var(--divider)" stroke-width="0.5"/><text x="${pad.left-8}" y="${y+4}" text-anchor="end" fill="${tc}" font-size="11">${fmt(v)}</text>`}
+const n=dates.length;if(n>1){const cnt=Math.min(6,n),step=Math.max(1,Math.floor(n/(cnt-1)));for(let i=0;i<n;i+=step){const d=dates[i],x=pad.left+i*cw/(n-1),p=d.split('-');svg+=`<text x="${x}" y="${H-6}" text-anchor="middle" fill="${tc}" font-size="10">${p.slice(1).join('/')}</text>`}}
+vis.forEach((g,gi)=>{const c=PALETTE[gi%PALETTE.length],pts=g.daily.filter(d=>dates.includes(d.date)).sort((a,b)=>a.date.localeCompare(b.date));if(!pts.length)return;let pd='',fd='';pts.forEach((p,i)=>{const di=dates.indexOf(p.date),x=pad.left+(n>1?di*cw/(n-1):cw/2),y=pad.top+ch-(p.total/niceMax)*ch;if(i===0){pd+=`M ${x} ${y}`;fd=`M ${x} ${pad.top+ch}`}else{const px=pad.left+(n>1?dates.indexOf(pts[i-1].date)*cw/(n-1):0),py=pad.top+ch-(pts[i-1].total/niceMax)*ch;pd+=` C ${px+(x-px)*0.4} ${py}, ${x-(x-px)*0.4} ${y}, ${x} ${y}`}});const lx=pad.left+(n>1?dates.indexOf(pts[pts.length-1].date)*cw/(n-1):cw/2),ly=pad.top+ch-(pts[pts.length-1].total/niceMax)*ch;fd+=` L ${lx} ${ly} L ${lx} ${pad.top+ch} Z`;svg+=`<path d="${fd}" fill="url(#a${gi})" opacity="0.7"/><path d="${pd}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;const lp=pts[pts.length-1];if(lp){const ldi=dates.indexOf(lp.date),lx2=pad.left+(n>1?ldi*cw/(n-1):cw/2),ly2=pad.top+ch-(lp.total/niceMax)*ch;svg+=`<circle cx="${lx2}" cy="${ly2}" r="3.5" fill="${c}" stroke="var(--card)" stroke-width="2"/>`}})
+chart.innerHTML=svg;
+let lh='';allGroups.forEach((g,i)=>{const c=PALETTE[i%PALETTE.length],h=hiddenSet.has(g.group_id)?'hidden':'';lh+=`<div class="legend-item ${h}" data-gid="${g.group_id}"><span class="dot" style="background:${c}"></span>${g.group_id}</div>`});legend.innerHTML=lh;legend.querySelectorAll('.legend-item').forEach(el=>{el.addEventListener('click',()=>{const id=el.dataset.gid;hiddenSet.has(id)?hiddenSet.delete(id):hiddenSet.add(id);drawChart(allGroups)})})}
+function renderRank(groups){if(!groups||!groups.length){rankList.innerHTML='<div class="empty-state"><div class="icon">📋</div><div>暂无数据</div><div class="hint">等待 LLM 调用产生数据后自动显示</div></div>';return}
+const mv=groups[0].total||1;let h='';groups.forEach((g,i)=>{const p=mv>0?g.total/mv*100:0;h+=`<div class="rank-item" style="animation-delay:${i*0.05}s"><div class="rank-num ${i<3?['gold','silver','bronze'][i]:''}">${i<3?['🥇','🥈','🥉'][i]:'#'+(i+1)}</div><div class="rank-info"><div class="name">${g.group_id||'未知群组'}</div><div class="detail">Prompt ${fmt(g.prompt)} · Completion ${fmt(g.completion)}</div></div><div class="rank-tokens">${fmt(g.total)}</div><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:0%"></div></div></div>`})
+rankList.innerHTML=h;requestAnimationFrame(()=>{document.querySelectorAll('.rank-item').forEach((el,i)=>{el.classList.add('visible');const bar=el.querySelector('.rank-bar-fill'),pct=groups[i]?groups[i].total/mv*100:0;setTimeout(()=>{bar.style.width=pct+'%'},100+i*50)})})}
+async function update(p){curPeriod=p;segs.forEach(s=>s.classList.toggle('active',s.dataset.period===p));try{
+const sr=await B.apiGet('token_stats',{period:p}),sd=sr&&sr.data?sr.data:sr;if(!sd)throw'No data';const g=sd.global||{},gr=sd.groups||[];totalNum.textContent=fmtFull(g.total||0);promptEl.textContent=fmtFull(g.prompt||0);compEl.textContent=fmtFull(g.completion||0);groupCnt.textContent=g.group_count||0
+const hr=await B.apiGet('token_history',{days:30}),hd=hr&&hr.data?hr.data:hr;drawChart((hd&&hd.groups)||[]);renderRank(gr)
+}catch(e){totalNum.textContent='—';promptEl.textContent='—';compEl.textContent='—';groupCnt.textContent='—';chart.innerHTML='<text x="500" y="165" text-anchor="middle" fill="var(--text3)" font-size="14">加载失败</text>'}}
+segs.forEach(s=>s.addEventListener('click',()=>update(s.dataset.period)));
+const obs=new IntersectionObserver(e=>e.forEach(i=>{if(i.isIntersecting)i.target.classList.add('visible')}),{threshold:.1});document.querySelectorAll('.chart-card,.rank-section h2').forEach(el=>obs.observe(el));
+await update(curPeriod)}</script>
+</body>
+</html>
