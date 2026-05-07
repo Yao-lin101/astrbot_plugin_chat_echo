@@ -561,19 +561,16 @@ class EchoPlugin(Star):
         if group_id:
             prompt_tokens = 0
             completion_tokens = 0
-            # 尝试从响应中提取 token 计数
-            if hasattr(resp, 'prompt_tokens'):
-                prompt_tokens = resp.prompt_tokens or 0
-            if hasattr(resp, 'completion_tokens'):
-                completion_tokens = resp.completion_tokens or 0
+            # 从 resp.usage 提取 token 计数
+            # LLMResponse.usage 是 TokenUsage 类型：
+            #   usage.input  = input_other + input_cached (输入 token 总数)
+            #   usage.output = 输出 token 数
             if hasattr(resp, 'usage') and resp.usage:
-                usage = resp.usage
-                if hasattr(usage, 'prompt_tokens'):
-                    prompt_tokens = usage.prompt_tokens or 0
-                if hasattr(usage, 'completion_tokens'):
-                    completion_tokens = usage.completion_tokens or 0
+                prompt_tokens = getattr(resp.usage, 'input', 0) or 0
+                completion_tokens = getattr(resp.usage, 'output', 0) or 0
             if prompt_tokens > 0 or completion_tokens > 0:
                 await self.token_counter.record(group_id, prompt_tokens, completion_tokens)
+                self.logger.debug(f"[Token] 群 {group_id} +{prompt_tokens}p/{completion_tokens}c")
 
         if hasattr(resp, "completion_text"):
             text = resp.completion_text
