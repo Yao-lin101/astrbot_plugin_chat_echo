@@ -106,11 +106,17 @@
       "step": 30
     }
   },
+  "enable_llm_tools": {
+    "type": "bool",
+    "description": "回复模式是否启用 LLM 工具/技能",
+    "hint": "开启后回复模式可使用搜索、发图、Function Calling 等技能，但有时 LLM 会只发图片不说话导致无文本回复。关闭则仅使用纯文本 LLM 回复",
+    "default": true
+  },
   "analyzer_system_prompt": {
     "type": "text",
     "description": "【回复分析】LLM 系统提示词",
     "hint": "用于判断群友消息是否在回复Bot的LLM提示词。输出应为JSON格式：{\"is_reply_to_bot\": \"yes|no|partial\", \"reason\": \"...\"}",
-    "default": "你是一个群聊对话分析师。请分析以下群聊上下文，判断最新的几条消息是否在回复机器人(Bot)。\n\n判断标准：\n1. 消息中直接@了Bot或提到了Bot的名字\n2. 消息内容明显是在回应Bot刚才说的内容\n3. 对话上下文表明对方是在跟Bot说话\n4. 如果消息是在跟其他人说话或闲聊，回复\"no\"\n5. 如果有些消息是回复Bot的但有些不是，回复\"partial\"并简要说明\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"is_reply_to_bot\": \"yes|no|partial\",\n  \"reason\": \"简短的原因说明\"\n}",
+    "default": "你是一个群聊对话分析师。请分析以下群聊上下文，判断群友的最新消息是否在和Bot对话。\n\n判断标准：\n1. 如果Bot上一条/上几条消息是bot发的，群友紧接着bot发言 → 就像正常聊天一样，默认是在对话\n2. 消息中提到Bot的名字或@了Bot → 是在对话\n3. 消息内容明显顺着Bot刚才的话题 → 是在对话\n4. 群友明显在跟其他人说（比如叫了别人名字、回应非Bot的消息）→ 不是在对话\n\n核心逻辑：像人一样判断——你刚说完话有人接话，正常人会认为对方是在和你说话。\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"is_reply_to_bot\": \"yes|no|partial\",\n  \"reason\": \"简短的原因说明\"\n}",
     "editor_mode": true,
     "editor_language": "markdown"
   },
@@ -118,7 +124,7 @@
     "type": "text",
     "description": "【主动分析】LLM 系统提示词",
     "hint": "用于判断Bot是否应该主动参与讨论的LLM提示词。输出应为JSON格式：{\"should_join\": \"yes|no\", \"reason\": \"...\"}",
-    "default": "你是一个群聊观察者。请分析以下群聊内容，判断Bot是否应该自然地参与讨论。\n\n判断标准：\n1. 群消息中提到的话题Bot是否了解或有见解\n2. 对话是否在邀请更多人参与（提问、征求意见等）\n3. Bot是否有一个自然的角度可以加入对话\n4. 如果Bot参与会显得突兀，回复\"no\"\n5. 如果Bot可以自然地接上话，回复\"yes\"\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"should_join\": \"yes|no\",\n  \"reason\": \"简短的原因说明\"\n}",
+    "default": "你是一个群聊观察者。请分析以下群聊内容，判断Bot是否应该参与讨论。\n\n判断标准：\n1. 群消息中提到的话题Bot是否了解或有见解\n2. 对话是否在邀请更多人参与（提问、征求意见等）\n3. Bot是否有想说的内容（吐槽、补充、提问、分享等）\n4. 只要是Bot有内容想回复，就回复\"yes\"\n5. 只有Bot完全无话可说时才回复\"no\"\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"should_join\": \"yes|no\",\n  \"reason\": \"简短的原因说明\"\n}",
     "editor_mode": true,
     "editor_language": "markdown"
   },

@@ -47,7 +47,7 @@
 | `proactive_cooldown_seconds` | int | `300` | 主动发言冷却(秒)，范围 30~3600 |
 | `enabled_groups` | list | `[]` | 群白名单（见下方说明）。留空则所有群生效 |
 | `analyzer_system_prompt` | text | 默认提示词 | 回复分析 LLM 提示词，用于判断群友消息是否在回复 Bot |
-| `proactive_analyzer_system_prompt` | text | 默认提示词 | 主动分析 LLM 提示词，用于判断 Bot 是否应主动参与讨论 |
+| `proactive_analyzer_system_prompt` | text | 默认提示词 | 主动分析 LLM 提示词，用于判断 Bot 是否应主动参与讨论。版本更新后会覆盖提示词，如需保留自定义提示词请自行备份 |
 | `generator_system_prompt` | text | 默认提示词 | 回复生成 LLM 提示词，控制 Bot 回复风格和语气 |
 
 ### 群白名单 (`enabled_groups`)
@@ -112,7 +112,7 @@ Bot 发言 → 开始跟踪窗口 → 群友回复 → LLM 分析是否回复 Bo
 
 ## 技术细节
 
-- **路由互斥**：回复模式（Route 1）和主动模式（Route 2）使用互斥锁，避免同时触发冲突
+- **路由互斥**：回复模式（Route 1）和主动模式（Route 2）使用 per-group 独立锁，避免同时触发冲突且群间不互相影响
 - **Token 统计**：每次 LLM 调用自动记录 Prompt/Completion Token 用量，按群按天聚合，自动清理超过 365 天的旧数据
 - **群名缓存**：群名自动捕获并持久化，Token 统计面板可直接显示群名
 
@@ -127,6 +127,13 @@ Bot 发言 → 开始跟踪窗口 → 群友回复 → LLM 分析是否回复 Bo
 ## 作者
 
 - [AMYdd00](https://github.com/AMYdd00)
+
+> 本插件代码完全由 AI 生成。
+
+## 相关链接
+
+- [AstrBot](https://github.com/AstrBotDevs/AstrBot) - 一个易于上手的多平台 LLM 对话机器人框架
+- [QQ 群](https://qm.qq.com/q/cOrzqdkW7m) - 欢迎提交 Issue 和加群反馈
 
 <div align="center">
   <img src="https://count.getloli.com/@astrbot_plugin_chat_echo?name=astrbot_plugin_chat_echo&theme=green&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto&prefix=0" alt="访问统计"/>

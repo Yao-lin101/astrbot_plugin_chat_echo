@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.0.1] - 2025-05-09
+
+### 修复
+- 🐛 修复 `_build_analyze_context` 缺少触发者消息内容，LLM 分析准确率提升
+- 🐛 修复 `TokenCounter._cache` 初始化不一致可能导致的崩溃
+- 🐛 修复全局单例锁导致群间上下文串扰，改为 per-group 独立锁
+- 🐛 修复 `from astrbot.core.agent.tool import ToolSet` 导入导致插件加载崩溃
+- 🐛 修复工具调用（发图/戳一戳等）后无文本导致流程中断
+- 🐛 修复图片 URL 传给不支持多模态的模型报错
+- 🐛 修复 Bot 读取 QQ 号错误，在 prompt 中注入真实 sender_id
+- 🐛 修复 `_get_period_range("year")" 语义偏差 → WebUI"本年"改为"近一年"
+- 🐛 修复 `_config_version` 写进配置污染 WebUI 配置页面
+
+### 新增
+- ✨ 回复模式支持调用 AstrBot 所有已注册工具/技能（搜索、发图、Function Calling），通过 `enable_llm_tools` 开关控制
+- ✨ Route 2（主动模式）新增滚动消息窗口，保留最近 10 条消息作为上下文
+- ✨ 图片/表情包识别：提取图片 URL 传给多模态 LLM 分析判断是否应回复
+- ✨ 群白名单预解析缓存，提升性能
+- ✨ 配置版本自动升级机制，版本号独立文件存储
+
+### 优化
+- 🔧 JSON 解析器改用括号匹配算法，提高解析准确率
+- 🔧 上下文截断（最多保留 20 条），防止 Token 膨胀
+- 🔧 异常处理使用 `logger.exception` 保留完整堆栈
+- 🔧 收窄异常类型，避免吞掉关键信号
+- 🔧 提取公共方法 `_extract_bot_text` 和 `_extract_sent_text`
+- 🔧 多轮对话、消息发送后的 Bot 消息加入窗口上下文
+- 🔧 回复分析提示词重写，模拟人类直觉判断
+
+### 文档
+- 📝 README 添加 AstrBot 仓库链接、QQ 群链接、AI 生成声明
+- 📝 配置说明标注版本升级会覆盖提示词
+- 📝 metadata.yaml 添加依赖声明
+
 ## [1.0.0] - 2025-05-08
 
 ### 新增
