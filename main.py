@@ -272,7 +272,8 @@ class EchoPlugin(Star):
             return
         # 捕获群名
         try:
-            gname = getattr(event, 'group_name', None) or ""
+            g = event.get_group()
+            gname = g.group_name if g else ""
         except Exception:
             gname = ""
         tracker = ConversationTracker(
@@ -463,7 +464,8 @@ class EchoPlugin(Star):
         try:
             # 捕获群名
             try:
-                gname = getattr(event, 'group_name', None) or ""
+                g = event.get_group()
+                gname = g.group_name if g else ""
                 if gname:
                     self.token_counter.set_group_name(group_id, gname)
             except Exception:
