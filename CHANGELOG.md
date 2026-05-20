@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.2] - 2025-05-21
+
+### 修复
+- 🐛 修复回复模式生成"小作文"问题：将"简短回复"指令作为真正的 `system_prompt` 传入，而非拼接到 user prompt 末尾
+- 🐛 修复人格设定（如"不要使用表情"）被忽略的问题：从 `persona_manager` 读取人格设定合并到 system prompt
+- 🐛 修复 `_handle_reply` 中 round 在 LLM 调用前递增，导致 LLM 失败时浪费轮数
+- 🐛 修复 `_call_generator_with_tools` 传入整个对话历史（970条/847k tokens），改为只传合并后的 system prompt
+- 🐛 清理 `_call_llm` 中残留的 `_load_contexts` 和 contexts 加载逻辑
+
+### 优化
+- 🔧 新增 `_build_generator_prompt` 方法，从 `persona_manager.get_default_persona_v3` 读取人格设定合并到 system_prompt
+- 🔧 不在生成回复时传入对话历史，大幅减少 token 消耗
+
 ## [1.0.1] - 2025-05-09
 
 ### 修复
