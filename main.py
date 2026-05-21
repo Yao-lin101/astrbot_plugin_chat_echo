@@ -17,6 +17,7 @@ import json
 import random
 import re
 import time
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from astrbot.api.event import filter, AstrMessageEvent, MessageChain
@@ -24,6 +25,9 @@ from astrbot.api.event.filter import EventMessageType
 from astrbot.api.star import Context, Star, register, StarTools
 from astrbot.api import logger
 from astrbot.core.message.components import Image as ImageComponent
+from astrbot.core.message.message_event_result import MessageEventResult, ResultContentType
+from astrbot.core.agent.message import UserMessageSegment, AssistantMessageSegment, TextPart
+from astrbot.core.agent.tool import ToolSet
 
 from .utils.token_counter import TokenCounter
 
@@ -76,6 +80,8 @@ CONFIG_VERSION = 3
 MAX_CONTEXT_MESSAGES = 20
 PROACTIVE_WINDOW_SIZE = 10
 
+# 配置版本文件（独立于 _conf_schema.json，避免污染配置）
+CONFIG_VERSION_FILE = "_config_version.txt"
 
 
 def _extract_image_urls(event: AstrMessageEvent) -> list:
@@ -98,7 +104,7 @@ class ConversationTracker:
         "group_id", "unified_msg_origin", "bot_message",
         "trigger_user_name", "trigger_user_id", "trigger_message",
         "collected", "expire_at",
-        "analyzing", "round", "detection_count", "alive", "group_name",
+        "analyzing", "detection_count", "alive", "group_name",
     )
 
     def __init__(self, group_id: str, unified_msg_origin: str,
@@ -114,13 +120,12 @@ class ConversationTracker:
         self.collected: List[dict] = []
         self.expire_at = time.time() + expire_seconds
         self.analyzing = False
-        self.round = 0
         self.detection_count = 0
         self.alive = True
         self.group_name = ""
 
 
-@register("astrbot_plugin_chat_echo", "AMYdd00", "主动接话插件", "1.0.2")
+@register("astrbot_plugin_chat_echo", "AMYdd00", "主动接话插件", "1.0.3")
 class EchoPlugin(Star):
 
     def __init__(self, context: Context, config=None):
@@ -132,6 +137,8 @@ class EchoPlugin(Star):
         self._proactive_flag: Dict[str, bool] = {}
         self._active_thinking: Dict[str, bool] = {}
         self._active_cooldowns: Dict[str, float] = {}
+        # 主动模式轮数追踪（只影响 Route 2，不影响 @bot 对话）
+        self._proactive_rounds: Dict[str, int] = {}
 
         self._parsed_groups: List[Tuple[str, Optional[int], Optional[int]]] = []
         self._recent_messages: Dict[str, List[dict]] = {}
@@ -158,9 +165,16 @@ class EchoPlugin(Star):
         self._upgrade_config()
         self.token_counter.start()
 
+    def _get_config_version_file(self):
+        """获取配置版本文件路径（数据目录下，独立于 _conf_schema.json）"""
+        return Path(StarTools.get_data_dir('chat_echo')) / CONFIG_VERSION_FILE
+
     def _upgrade_config(self):
         try:
-            cfg_version = int(self._cfg("_config_version", 0))
+            ver_file = self._get_config_version_file()
+            cfg_version = 0
+            if ver_file.exists():
+                cfg_version = int(ver_file.read_text().strip())
             if cfg_version >= CONFIG_VERSION:
                 return
             self.logger.info(f"检测到配置版本 {cfg_version}，正在升级至 {CONFIG_VERSION}，将覆盖提示词...")
@@ -168,13 +182,13 @@ class EchoPlugin(Star):
                 self.config["proactive_analyzer_system_prompt"] = DEFAULT_PROACTIVE_ANALYZER_PROMPT
                 self.config["analyzer_system_prompt"] = DEFAULT_ANALYZER_PROMPT
                 self.config["generator_system_prompt"] = DEFAULT_GENERATOR_PROMPT
-                self.config["_config_version"] = CONFIG_VERSION
             else:
                 self.config.proactive_analyzer_system_prompt = DEFAULT_PROACTIVE_ANALYZER_PROMPT
                 self.config.analyzer_system_prompt = DEFAULT_ANALYZER_PROMPT
                 self.config.generator_system_prompt = DEFAULT_GENERATOR_PROMPT
-                self.config._config_version = CONFIG_VERSION
             self.config.save_config()
+            ver_file.parent.mkdir(parents=True, exist_ok=True)
+            ver_file.write_text(str(CONFIG_VERSION))
             self.logger.info(f"配置已升级并保存 (v{CONFIG_VERSION})")
         except Exception as e:
             self.logger.exception(f"配置升级失败: {e}")
@@ -201,16 +215,13 @@ class EchoPlugin(Star):
     def _active_probability(self) -> int:
         return int(self._cfg("active_probability", 0))
 
-    def _active_interval(self) -> int:
-        return int(self._cfg("active_interval_minutes", 30)) * 60
-
     def _enabled_groups(self) -> list:
         return self._cfg("enabled_groups", [])
 
     def _max_rounds(self) -> int:
         return int(self._cfg("max_proactive_rounds", 3))
 
-    def _cooldown(self) -> int:
+    def _proactive_cooldown(self) -> int:
         return int(self._cfg("proactive_cooldown_seconds", 300))
 
     def _analyzer_provider(self) -> str:
@@ -317,10 +328,6 @@ class EchoPlugin(Star):
         sender_name = event.get_sender_name()
         sender_id = str(event.get_sender_id())
         trigger_message = event.message_str
-        now = time.time()
-        last_time = self._cooldowns.get(group_id, 0)
-        if now - last_time < self._cooldown():
-            return
         if group_id in self._trackers and self._trackers[group_id].alive:
             return
         gname = ""
@@ -414,7 +421,6 @@ class EchoPlugin(Star):
         if not msg_content.strip():
             msg_content = event.get_message_outline()
 
-        # 提取图片 URL（用于多模态 LLM 分析）
         image_urls = _extract_image_urls(event)
 
         msg = {
@@ -435,6 +441,8 @@ class EchoPlugin(Star):
         if is_bot:
             return
 
+        # ====== 回复模式 (Route 1)：Bot 发言后的跟踪窗口 ======
+        # @bot 对话不受 max_proactive_rounds 和 proactive_cooldown 限制
         tracker = self._trackers.get(group_id)
         if tracker and tracker.alive:
             if now > tracker.expire_at:
@@ -444,21 +452,22 @@ class EchoPlugin(Star):
                 tracker.collected.append(msg)
                 if tracker.analyzing or self._active_thinking.get(group_id):
                     return
-                if tracker.round >= self._max_rounds():
-                    self._cleanup_tracker(group_id)
-                    return
                 if self._is_probability_hit(self._get_effective_reply_prob(group_id, umo)):
                     tracker.analyzing = True
                     return await self._handle_reply(tracker, event)
                 return
 
+        # ====== 主动模式 (Route 2)：Bot 随机参与讨论 ======
         if self._active_thinking.get(group_id) or self._proactive_flag.get(group_id):
             return
         active_prob = self._get_effective_active_prob(group_id, umo)
         if active_prob <= 0:
             return
         last_active = self._active_cooldowns.get(group_id, 0)
-        if now - last_active < self._active_interval():
+        if now - last_active < self._proactive_cooldown():
+            return
+        rounds = self._proactive_rounds.get(group_id, 0)
+        if rounds >= self._max_rounds():
             return
         tracker_check = self._trackers.get(group_id)
         if tracker_check and tracker_check.alive:
@@ -467,15 +476,15 @@ class EchoPlugin(Star):
             self._active_thinking[group_id] = True
             return await self._handle_proactive(event, msg, window)
 
-    async def _handle_reply(self, tracker: ConversationTracker, event: AstrMessageEvent) -> Optional[MessageChain]:
-        """处理回复模式。返回 MessageEventResult 让 pipeline 继续走正常发送流程。"""
+    async def _handle_reply(self, tracker: ConversationTracker, event: AstrMessageEvent) -> Optional[MessageEventResult]:
+        """处理回复模式。@bot 后的正常回复对话，不受轮数限制。"""
         group_id = tracker.group_id
         try:
             context_text, image_urls = self._build_analyze_context(tracker)
             self.logger.info(f"[回复] 分析群 {group_id} 的回复是否针对 Bot...")
             analysis = await self._call_analyzer(context_text, image_urls=image_urls, umo=tracker.unified_msg_origin)
             if analysis is None:
-                return
+                return None
             is_reply = analysis.get("is_reply_to_bot", "no")
             reason = analysis.get("reason", "")
             if is_reply == "no":
@@ -485,7 +494,7 @@ class EchoPlugin(Star):
                 if tracker.detection_count >= max_detect:
                     self.logger.info(f"[回复] 群 {group_id} 已达最大检测次数，停止")
                     self._cleanup_tracker(group_id)
-                return
+                return None
             self.logger.info(f"[回复] 群 {group_id} 的回复针对 Bot | 原因: {reason}")
             if self._enable_llm_tools():
                 reply_text = await self._call_generator_with_tools(context_text, event=event, image_urls=image_urls, umo=tracker.unified_msg_origin)
@@ -493,49 +502,38 @@ class EchoPlugin(Star):
                 reply_text = await self._call_generator_raw(context_text, image_urls=image_urls, umo=tracker.unified_msg_origin)
             if not reply_text:
                 self.logger.warning(f"[回复] 群 {group_id} 生成回复为空")
-                return
-            # round 在成功生成回复后才递增
-            tracker.round += 1
-            self.logger.info(f"[回复] 主动回复群 {group_id} (第{tracker.round}轮): {reply_text[:60]}")
+                return None
+            self.logger.info(f"[回复] 回复群 {group_id}: {reply_text[:60]}")
             self._proactive_flag[group_id] = True
+
+            result = MessageEventResult()
+            result.message(reply_text)
+            result.set_result_content_type(ResultContentType.LLM_RESULT)
             try:
-                from astrbot.core.message.message_event_result import MessageEventResult, ResultContentType
-                result = MessageEventResult()
-                result.message(reply_text)
-                result.set_result_content_type(ResultContentType.LLM_RESULT)
-                # 将本次对话写回会话历史，保证上下文连续性
-                try:
-                    conv_mgr = self.context.conversation_manager
-                    cid = await conv_mgr.get_curr_conversation_id(tracker.unified_msg_origin)
-                    if cid:
-                        from astrbot.core.agent.message import (
-                            UserMessageSegment, AssistantMessageSegment, TextPart
-                        )
-                        await conv_mgr.add_message_pair(
-                            cid=cid,
-                            user_message=UserMessageSegment(content=[TextPart(text=tracker.trigger_message)]),
-                            assistant_message=AssistantMessageSegment(content=[TextPart(text=reply_text)]),
-                        )
-                except Exception as e:
-                    self.logger.exception(f"[回复] 写入会话历史失败: {e}")
-                self._cooldowns[group_id] = time.time()
-                tracker.detection_count = 0
-                tracker.expire_at = time.time() + self._track_timeout()
-                if tracker.round >= self._max_rounds():
-                    self.logger.info(f"[回复] 群 {group_id} 已达到最大主动回复轮数")
-                    self._cleanup_tracker(group_id)
-                return result
+                conv_mgr = self.context.conversation_manager
+                cid = await conv_mgr.get_curr_conversation_id(tracker.unified_msg_origin)
+                if cid:
+                    await conv_mgr.add_message_pair(
+                        cid=cid,
+                        user_message=UserMessageSegment(content=[TextPart(text=tracker.trigger_message)]),
+                        assistant_message=AssistantMessageSegment(content=[TextPart(text=reply_text)]),
+                    )
             except Exception as e:
-                self.logger.exception(f"[回复] 发送消息失败: {e}")
-            finally:
-                self._proactive_flag[group_id] = False
+                self.logger.exception(f"[回复] 写入会话历史失败: {e}")
+            tracker.detection_count = 0
+            tracker.expire_at = time.time() + self._track_timeout()
+            self._proactive_flag[group_id] = False
+            return result
+
         except Exception as e:
             self.logger.exception(f"[回复] 处理异常: {e}")
+            return None
         finally:
             tracker.analyzing = False
+            self._proactive_flag[group_id] = False
 
-    async def _handle_proactive(self, event: AstrMessageEvent, msg: dict, recent_window: List[dict]) -> Optional[MessageChain]:
-        """处理主动模式。返回 MessageEventResult 让 pipeline 继续走正常发送流程。"""
+    async def _handle_proactive(self, event: AstrMessageEvent, msg: dict, recent_window: List[dict]) -> Optional[MessageEventResult]:
+        """处理主动模式。Bot 随机参与群聊，受 max_proactive_rounds 和 proactive_cooldown 限制。"""
         group_id = str(event.get_group_id())
         try:
             gname = ""
@@ -558,48 +556,49 @@ class EchoPlugin(Star):
             self.logger.info(f"[主动] 分析群 {group_id} 是否应参与讨论...")
             analysis = await self._call_proactive_analyzer(context_text, image_urls=all_image_urls, umo=event.unified_msg_origin)
             if analysis is None:
-                return
+                return None
             should_join = analysis.get("should_join", "no")
             reason = analysis.get("reason", "")
             if should_join == "no":
                 self.logger.info(f"[主动] 群 {group_id} 不应参与 ({reason})")
-                return
+                return None
             self.logger.info(f"[主动] 群 {group_id} 可以参与 | 原因: {reason}")
 
             reply_text = await self._call_generator_raw(context_text, image_urls=all_image_urls, umo=event.unified_msg_origin)
             if not reply_text:
-                return
-            self.logger.info(f"[主动] 主动发言群 {group_id}: {reply_text[:60]}")
+                return None
+
+            rounds = self._proactive_rounds.get(group_id, 0) + 1
+            self._proactive_rounds[group_id] = rounds
+            self.logger.info(f"[主动] 主动发言群 {group_id} (第{rounds}/{self._max_rounds()}轮): {reply_text[:60]}")
             self._proactive_flag[group_id] = True
+
+            result = MessageEventResult()
+            result.message(reply_text)
+            result.set_result_content_type(ResultContentType.LLM_RESULT)
             try:
-                from astrbot.core.message.message_event_result import MessageEventResult, ResultContentType
-                result = MessageEventResult()
-                result.message(reply_text)
-                result.set_result_content_type(ResultContentType.LLM_RESULT)
-                try:
-                    conv_mgr = self.context.conversation_manager
-                    cid = await conv_mgr.get_curr_conversation_id(event.unified_msg_origin)
-                    if cid:
-                        from astrbot.core.agent.message import (
-                            UserMessageSegment, AssistantMessageSegment, TextPart
-                        )
-                        await conv_mgr.add_message_pair(
-                            cid=cid,
-                            user_message=UserMessageSegment(content=[TextPart(text=msg['content'])]),
-                            assistant_message=AssistantMessageSegment(content=[TextPart(text=reply_text)]),
-                        )
-                except Exception as e:
-                    self.logger.exception(f"[主动] 写入会话历史失败: {e}")
-                self._active_cooldowns[group_id] = time.time()
-                return result
+                conv_mgr = self.context.conversation_manager
+                cid = await conv_mgr.get_curr_conversation_id(event.unified_msg_origin)
+                if cid:
+                    await conv_mgr.add_message_pair(
+                        cid=cid,
+                        user_message=UserMessageSegment(content=[TextPart(text=msg['content'])]),
+                        assistant_message=AssistantMessageSegment(content=[TextPart(text=reply_text)]),
+                    )
             except Exception as e:
-                self.logger.exception(f"[主动] 发送消息失败: {e}")
-            finally:
-                self._proactive_flag[group_id] = False
+                self.logger.exception(f"[主动] 写入会话历史失败: {e}")
+            self._active_cooldowns[group_id] = time.time()
+            if rounds >= self._max_rounds():
+                self.logger.info(f"[主动] 群 {group_id} 已达到最大主动轮数，停止本轮主动参与")
+            self._proactive_flag[group_id] = False
+            return result
+
         except Exception as e:
             self.logger.exception(f"[主动] 处理异常: {e}")
+            return None
         finally:
             self._active_thinking[group_id] = False
+            self._proactive_flag[group_id] = False
 
     def _build_analyze_context(self, tracker: ConversationTracker):
         """构建分析上下文，返回 (context_text, image_urls)"""
@@ -691,7 +690,6 @@ class EchoPlugin(Star):
         if not provider_id:
             return None
         try:
-            from astrbot.core.agent.tool import ToolSet
             tool_mgr = self.context.get_llm_tool_manager()
             tools = ToolSet(tool_mgr.func_list) if tool_mgr and tool_mgr.func_list else None
         except Exception as e:
@@ -842,3 +840,8 @@ class EchoPlugin(Star):
         self._trackers.clear()
         self._cooldowns.clear()
         self._active_cooldowns.clear()
+        self._proactive_flag.clear()
+        self._active_thinking.clear()
+        self._recent_messages.clear()
+        self._parsed_groups.clear()
+        self._proactive_rounds.clear()

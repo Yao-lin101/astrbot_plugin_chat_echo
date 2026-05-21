@@ -3,7 +3,7 @@ display_name: 主动接话插件
 author: "AMYdd00"
 desc: "Bot发出消息后，自动分析后续群友回复并使用LLM主动接话。支持双模式工作：回复模式（Bot发言后监听群友回复）和主动模式（Bot没发言时按概率参与群聊）。自带Token用量统计面板。"
 short_desc: "智能群聊主动接话插件 - 分析群友回复并使用LLM自然接话"
-version: "1.0.2"
+version: "1.0.3"
 
 repo: "https://github.com/AMYdd00/astrbot_plugin_chat_echo"
 support_platforms:

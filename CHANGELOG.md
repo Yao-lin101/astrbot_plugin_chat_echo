@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.3] - 2025-05-21
+
+### 修复
+- 🐛 修复 `_proactive_flag` 在 `finally` 中提前重置导致并发防护失效的核心 Bug
+- 🐛 修复 `max_proactive_rounds` 错误地限制回复模式（@bot 对话），现仅影响主动模式（Route 2）
+- 🐛 修复 `proactive_cooldown_seconds` 从未被使用的死代码问题，现真正应用于主动模式冷却
+- 🐛 修复函数返回类型标注 `MessageChain` 应为 `MessageEventResult`
+- 🐛 修复 `_upgrade_config` 将 `_config_version` 写入配置文件污染 `_conf_schema.json`，现使用独立版本文件
+
+### 优化
+- 🔧 回复模式（Route 1）与主动模式（Route 2）逻辑完全解耦，@bot 对话不受轮数和冷却限制
+- 🔧 新增 `_proactive_rounds` 字典单独追踪主动模式轮数
+- 🔧 移除冗余配置 `reply_cooldown_seconds`（由 `track_timeout_seconds` 控制即可）
+- 🔧 移除废弃配置 `active_interval_minutes`
+- 🔧 函数内 `import` 移至文件顶部，减少运行时开销
+- 🔧 `terminate()` 中补全清理所有字典（`_proactive_flag`、`_active_thinking`、`_recent_messages` 等）
+- 🔧 修正 `enable_llm_tools` 配置描述中的误导性表述
+
 ## [1.0.2] - 2025-05-21
 
 ### 修复

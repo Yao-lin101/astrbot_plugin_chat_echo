@@ -67,17 +67,6 @@
       "step": 5
     }
   },
-  "active_interval_minutes": {
-    "type": "int",
-    "description": "主动模式 - 最小触发间隔（分钟）",
-    "hint": "主动参与的最小间隔，防止太频繁。例：30表示每30分钟最多主动参与一次。仅在 active_probability > 0 时生效",
-    "default": 30,
-    "slider": {
-      "min": 1,
-      "max": 480,
-      "step": 5
-    }
-  },
   "enabled_groups": {
     "type": "list",
     "description": "群白名单（支持按群自定义概率）",
@@ -86,19 +75,19 @@
   },
   "max_proactive_rounds": {
     "type": "int",
-    "description": "最大连续主动回复轮数",
-    "hint": "最多连续主动回复几次，Bot回复后自动开启新一轮监听（1表示只接话一次不再继续，3表示最多接3轮）",
+    "description": "主动模式 - 最大参与轮数",
+    "hint": "Bot随机主动参与群聊的最大次数，达到后不再在本次启动周期中主动插话。仅影响主动模式（Route 2），不影响@bot对话。0=不限制",
     "default": 3,
     "slider": {
-      "min": 1,
+      "min": 0,
       "max": 10,
       "step": 1
     }
   },
   "proactive_cooldown_seconds": {
     "type": "int",
-    "description": "主动发言冷却时间（秒）",
-    "hint": "每次主动发言后，等待多久才能再次在该群触发新的跟踪窗口。建议配合 max_proactive_rounds 使用",
+    "description": "主动模式 - 冷却时间（秒）",
+    "hint": "主动模式下，每次Bot主动发言后，等待多久才能再次在该群触发新的主动参与。建议配合 max_proactive_rounds 使用",
     "default": 300,
     "slider": {
       "min": 30,
@@ -109,7 +98,7 @@
   "enable_llm_tools": {
     "type": "bool",
     "description": "回复模式是否启用 LLM 工具/技能",
-    "hint": "开启后回复模式可使用搜索、发图、Function Calling 等技能，但有时 LLM 会只发图片不说话导致无文本回复。关闭则仅使用纯文本 LLM 回复",
+    "hint": "开启后回复模式使用 AstrBot 工具循环，LLM 可调用已注册的工具/技能（如搜索、图片生成等）。关闭则仅使用纯文本 LLM 生成，不调用任何工具",
     "default": true
   },
   "analyzer_system_prompt": {
