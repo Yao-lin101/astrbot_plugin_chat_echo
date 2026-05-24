@@ -3,11 +3,11 @@ Token 计数工具
 记录 astrbot_plugin_chat_echo 插件每次 LLM 调用的 token 用量，
 按群按天聚合存储，自动清理超过一年的旧数据。
 """
-import json
+
 import asyncio
-from pathlib import Path
+import json
 from datetime import date, timedelta
-from typing import Dict, List, Optional
+from pathlib import Path
 
 from astrbot.api import logger
 
@@ -25,12 +25,12 @@ class TokenCounter:
     def __init__(self, data_dir: str):
         self.data_dir = Path(data_dir) / "token_stats"
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self._cache: Dict[str, dict] = {}  # 修复：在 __init__ 中初始化
-        self._dirty: Dict[str, bool] = {}
-        self._save_task: Optional[asyncio.Task] = None
+        self._cache: dict[str, dict] = {}  # 修复：在 __init__ 中初始化
+        self._dirty: dict[str, bool] = {}
+        self._save_task: asyncio.Task | None = None
         self._running = False
         # 群名持久化
-        self._group_names: Dict[str, str] = {}
+        self._group_names: dict[str, str] = {}
         self._names_file = self.data_dir / "group_names.json"
         self._load_group_names()
         self._names_dirty = False
@@ -39,17 +39,17 @@ class TokenCounter:
         """从磁盘加载群名缓存"""
         if self._names_file.exists():
             try:
-                with open(str(self._names_file), 'r', encoding='utf-8') as f:
+                with open(str(self._names_file), encoding="utf-8") as f:
                     self._group_names = json.load(f)
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 self._group_names = {}
 
     def _save_group_names(self):
         """持久化群名到磁盘"""
         try:
-            with open(str(self._names_file), 'w', encoding='utf-8') as f:
+            with open(str(self._names_file), "w", encoding="utf-8") as f:
                 json.dump(self._group_names, f, ensure_ascii=False, indent=2)
-        except IOError as e:
+        except OSError as e:
             logger.error(f"保存群名失败: {e}")
 
     def set_group_name(self, group_id: str, group_name: str):
@@ -76,11 +76,11 @@ class TokenCounter:
         days = {}
         if fp.exists():
             try:
-                with open(str(fp), 'r', encoding='utf-8') as f:
+                with open(str(fp), encoding="utf-8") as f:
                     data = json.load(f)
                 self._cleanup(group_id, data)
                 days = data.get("days", {})
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 days = {}
         self._cache[group_id] = days
         return {"days": days}
@@ -96,12 +96,12 @@ class TokenCounter:
         fp = self._get_file(group_id)
         try:
             fp.parent.mkdir(parents=True, exist_ok=True)
-            tmp = fp.with_suffix('.tmp')
-            with open(str(tmp), 'w', encoding='utf-8') as f:
+            tmp = fp.with_suffix(".tmp")
+            with open(str(tmp), "w", encoding="utf-8") as f:
                 json.dump({"days": days_data}, f, ensure_ascii=False)
             tmp.replace(fp)
             self._dirty[group_id] = False
-        except IOError as e:
+        except OSError as e:
             logger.error(f"保存 token 数据失败 [{group_id}]: {e}")
 
     def _cleanup(self, group_id: str, data: dict):
@@ -124,7 +124,7 @@ class TokenCounter:
             days[today] = {"prompt": 0, "completion": 0, "total": 0}
         days[today]["prompt"] += prompt
         days[today]["completion"] += completion
-        days[today]["total"] += (prompt + completion)
+        days[today]["total"] += prompt + completion
         self._dirty[group_id] = True
 
     # ======== 查询接口 ========
@@ -155,9 +155,14 @@ class TokenCounter:
                 prompt += v.get("prompt", 0)
                 completion += v.get("completion", 0)
                 total += v.get("total", 0)
-        return {"group_id": group_id, "prompt": prompt, "completion": completion, "total": total}
+        return {
+            "group_id": group_id,
+            "prompt": prompt,
+            "completion": completion,
+            "total": total,
+        }
 
-    async def get_daily(self, group_id: str, days_count: int = 30) -> List[dict]:
+    async def get_daily(self, group_id: str, days_count: int = 30) -> list[dict]:
         """获取最近 N 天逐日数据（优先从缓存读取，若无则加载）"""
         self._load(group_id)
         days = self._cache.get(group_id, {})
@@ -166,10 +171,17 @@ class TokenCounter:
         for i in range(days_count):
             d = str(today - timedelta(days=days_count - 1 - i))
             v = days.get(d, {"prompt": 0, "completion": 0, "total": 0})
-            result.append({"date": d, "prompt": v["prompt"], "completion": v["completion"], "total": v["total"]})
+            result.append(
+                {
+                    "date": d,
+                    "prompt": v["prompt"],
+                    "completion": v["completion"],
+                    "total": v["total"],
+                }
+            )
         return result
 
-    async def get_all_groups_daily(self, days_count: int = 30) -> List[dict]:
+    async def get_all_groups_daily(self, days_count: int = 30) -> list[dict]:
         """获取所有群最近 N 天的逐日数据（用于多线图）"""
         groups = []
         # 从缓存而非磁盘读取
@@ -179,9 +191,22 @@ class TokenCounter:
             for i in range(days_count):
                 d = str(today - timedelta(days=days_count - 1 - i))
                 v = days.get(d, {"prompt": 0, "completion": 0, "total": 0})
-                daily.append({"date": d, "prompt": v["prompt"], "completion": v["completion"], "total": v["total"]})
+                daily.append(
+                    {
+                        "date": d,
+                        "prompt": v["prompt"],
+                        "completion": v["completion"],
+                        "total": v["total"],
+                    }
+                )
             if any(d["total"] > 0 for d in daily):
-                groups.append({"group_id": gid, "group_name": self.get_group_name(gid), "daily": daily})
+                groups.append(
+                    {
+                        "group_id": gid,
+                        "group_name": self.get_group_name(gid),
+                        "daily": daily,
+                    }
+                )
         # 补充磁盘中有但缓存未加载的群
         for fp in self.data_dir.glob("*.json"):
             gid = fp.stem
@@ -195,14 +220,27 @@ class TokenCounter:
             for i in range(days_count):
                 d = str(today - timedelta(days=days_count - 1 - i))
                 v = days.get(d, {"prompt": 0, "completion": 0, "total": 0})
-                daily.append({"date": d, "prompt": v["prompt"], "completion": v["completion"], "total": v["total"]})
+                daily.append(
+                    {
+                        "date": d,
+                        "prompt": v["prompt"],
+                        "completion": v["completion"],
+                        "total": v["total"],
+                    }
+                )
             if any(d["total"] > 0 for d in daily):
-                groups.append({"group_id": gid, "group_name": self.get_group_name(gid), "daily": daily})
+                groups.append(
+                    {
+                        "group_id": gid,
+                        "group_name": self.get_group_name(gid),
+                        "daily": daily,
+                    }
+                )
         # 按总 token 排序
         groups.sort(key=lambda g: sum(d["total"] for d in g["daily"]), reverse=True)
         return groups
 
-    async def get_all_groups_summary(self, period: str = "all") -> List[dict]:
+    async def get_all_groups_summary(self, period: str = "all") -> list[dict]:
         """获取所有群汇总排行"""
         groups = []
         for gid in list(self._cache.keys()):
@@ -232,7 +270,7 @@ class TokenCounter:
             "total": sum(g["total"] for g in groups),
             "prompt": sum(g["prompt"] for g in groups),
             "completion": sum(g["completion"] for g in groups),
-            "group_count": len(groups)
+            "group_count": len(groups),
         }
 
     # ======== 持久化 ========

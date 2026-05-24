@@ -23,6 +23,19 @@
     "default": "",
     "hint": "用于生成主动回复内容的LLM（建议用质量高的模型如GPT-5.5）。留空则使用该会话的默认Provider"
   },
+  "enable_image_caption": {
+    "type": "bool",
+    "description": "启用图片转述（非多模态模型建议开启）",
+    "hint": "若使用的不是多模态模型，开启此项可对群聊消息中的图片使用图片转述模型进行描述转述，供模型阅读。",
+    "default": false
+  },
+  "image_caption_provider_id": {
+    "type": "string",
+    "description": "图片转述 LLM Provider",
+    "_special": "select_provider",
+    "default": "",
+    "hint": "用于图片转述的LLM（如多模态模型如GPT-4o/Gemini/Claude等）。留空则使用会话默认或全局图片转述Provider"
+  },
   "track_timeout_seconds": {
     "type": "int",
     "description": "回复模式 - 跟踪窗口超时（秒）",
