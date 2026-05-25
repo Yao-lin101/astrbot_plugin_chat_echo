@@ -19,16 +19,6 @@ DEFAULT_ANALYZER_PROMPT = """你是一个群聊对话分析师。请分析以下
   "reason": "简短的原因说明"
 }"""
 
-DEFAULT_GENERATOR_PROMPT = """你正在参与群聊讨论，请自然地接上对话。记住你是群里的一个成员，不是AI助手。
-
-【回复要求】
-- 回复要简短，一两句话就行，不要长篇大论
-- 口语化，像真人聊天那样
-- 结合你刚才说的内容 and 群友的回复来回应
-- 可以适当使用工具、搜索、发图等来丰富回复
-- 不要输出思考过程
-- 不要长篇说教或分析"""
-
 DEFAULT_PROACTIVE_ANALYZER_PROMPT = """你是一个群聊观察者。请分析以下群聊内容，判断你是否应该参与讨论。
 
 判断标准：
@@ -65,11 +55,9 @@ def upgrade_config(config, data_dir: Path, logger) -> None:
                 DEFAULT_PROACTIVE_ANALYZER_PROMPT
             )
             config["analyzer_system_prompt"] = DEFAULT_ANALYZER_PROMPT
-            config["generator_system_prompt"] = DEFAULT_GENERATOR_PROMPT
         else:
             config.proactive_analyzer_system_prompt = DEFAULT_PROACTIVE_ANALYZER_PROMPT
             config.analyzer_system_prompt = DEFAULT_ANALYZER_PROMPT
-            config.generator_system_prompt = DEFAULT_GENERATOR_PROMPT
         if hasattr(config, "save_config"):
             config.save_config()
         ver_file.parent.mkdir(parents=True, exist_ok=True)
@@ -229,10 +217,6 @@ class ConfigHelper:
     def analyzer_prompt(self) -> str:
         raw = self.cfg("analyzer_system_prompt", "")
         return raw.strip() or DEFAULT_ANALYZER_PROMPT
-
-    def generator_prompt(self) -> str:
-        raw = self.cfg("generator_system_prompt", "")
-        return raw.strip() or DEFAULT_GENERATOR_PROMPT
 
     def proactive_analyzer_prompt(self) -> str:
         raw = self.cfg("proactive_analyzer_system_prompt", "")

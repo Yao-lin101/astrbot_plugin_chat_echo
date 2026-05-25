@@ -3,18 +3,6 @@ import time
 import zoneinfo
 
 from astrbot.api.event import AstrMessageEvent
-from astrbot.core.agent.message import (
-    AssistantMessageSegment,
-    TextPart,
-    UserMessageSegment,
-)
-from astrbot.core.message.message_event_result import (
-    MessageEventResult,
-    ResultContentType,
-)
-from astrbot.core.pipeline.context_utils import call_event_hook
-from astrbot.core.provider.entities import LLMResponse
-from astrbot.core.star.star_handler import EventType
 
 from .helpers import extract_image_urls
 from .tracker import ConversationTracker
@@ -165,8 +153,10 @@ async def ensure_context_captions(plugin, messages: list[dict], umo: str) -> Non
 
 async def handle_reply(
     plugin, tracker: ConversationTracker, event: AstrMessageEvent
-) -> MessageEventResult | None:
-    """Process message under active tracking window (Route 1)."""
+) -> bool:
+    """Process message under active tracking window (Route 1).
+    Returns True if reply is triggered, False otherwise.
+    """
     group_id = tracker.group_id
     try:
         await ensure_context_captions(
@@ -197,7 +187,7 @@ async def handle_reply(
             persona_name=persona_name,
         )
         if analysis is None:
-            return None
+            return False
         is_reply = analysis.get("is_reply_to_bot", "no")
         reason = analysis.get("reason", "")
         if is_reply == "no":
@@ -212,96 +202,28 @@ async def handle_reply(
                     f"[Reply] Max detection count reached for group {group_id}, stopping track."
                 )
                 plugin.tracker_manager.cleanup_tracker(group_id)
-            return None
+            return False
 
         plugin.logger.info(
             f"[Reply] Group {group_id} is replying to Bot | Reason: {reason}"
         )
-        if plugin.config_helper.enable_llm_tools():
-            reply_text = await plugin.llm_handler.call_generator_with_tools(
-                context_text,
-                event=event,
-                image_urls=image_urls,
-                umo=tracker.unified_msg_origin,
-            )
-        else:
-            reply_text = await plugin.llm_handler.call_generator_raw(
-                context_text, image_urls=image_urls, umo=tracker.unified_msg_origin
-            )
-        if not reply_text:
-            plugin.logger.warning(
-                f"[Reply] Empty reply text generated for group {group_id}"
-            )
-            return None
-
-        # Trigger OnLLMResponseEvent event for plugin cooperation (e.g. meme_manager)
-        llm_response = LLMResponse(role="assistant", completion_text=reply_text)
-        await call_event_hook(event, EventType.OnLLMResponseEvent, llm_response)
-        reply_text = llm_response.completion_text
-
-        plugin.logger.info(f"[Reply] Replying to group {group_id}: {reply_text[:60]}")
-        plugin.tracker_manager.set_proactive_flag(group_id, True)
-
-        result = MessageEventResult()
-        result.message(reply_text)
-        result.set_result_content_type(ResultContentType.LLM_RESULT)
-        try:
-            conv_mgr = plugin.context.conversation_manager
-            cid = await conv_mgr.get_curr_conversation_id(tracker.unified_msg_origin)
-            if cid:
-                user_msg_content = ""
-                if tracker.collected:
-                    user_msg_content = tracker.collected[-1].get("content") or ""
-                if not user_msg_content:
-                    user_msg_content = event.message_str or ""
-
-                global_cfg = plugin.context.get_config(umo=tracker.unified_msg_origin)
-                reminder = build_system_reminder(event, global_cfg)
-
-                parts = [TextPart(text=user_msg_content)]
-                if reminder:
-                    parts.append(TextPart(text=reminder))
-
-                await conv_mgr.add_message_pair(
-                    cid=cid,
-                    user_message=UserMessageSegment(content=parts),
-                    assistant_message=AssistantMessageSegment(
-                        content=[TextPart(text=reply_text)]
-                    ),
-                )
-        except Exception as e:
-            plugin.logger.exception(
-                f"[Reply] Failed to write conversation history: {e}"
-            )
-
-        # Append Bot's own response to tracker.collected
-        tracker.collected.append(
-            {
-                "user_name": "你",
-                "user_id": "bot",
-                "content": reply_text,
-                "image_urls": [],
-                "time": time.time(),
-                "is_at_bot": False,
-            }
-        )
+        # Reset detection count for next time
         tracker.detection_count = 0
-        tracker.expire_at = time.time() + plugin.config_helper.track_timeout()
-        plugin.tracker_manager.set_proactive_flag(group_id, False)
-        return result
+        return True
 
     except Exception as e:
         plugin.logger.exception(f"[Reply] Error in handle_reply: {e}")
-        return None
+        return False
     finally:
         tracker.analyzing = False
-        plugin.tracker_manager.set_proactive_flag(group_id, False)
 
 
 async def handle_proactive(
     plugin, event: AstrMessageEvent, msg: dict, recent_window: list[dict]
-) -> MessageEventResult | None:
-    """Process message under proactive activation check (Route 2)."""
+) -> bool:
+    """Process message under proactive activation check (Route 2).
+    Returns True if proactive participation is approved, False otherwise.
+    """
     group_id = str(event.get_group_id())
     try:
         await ensure_context_captions(plugin, recent_window, event.unified_msg_origin)
@@ -352,79 +274,36 @@ async def handle_proactive(
             persona_name=persona_name,
         )
         if analysis is None:
-            return None
+            return False
         should_join = analysis.get("should_join", "no")
         reason = analysis.get("reason", "")
         if should_join == "no":
             plugin.logger.info(
                 f"[Proactive] Group {group_id} does not warrant participation ({reason})"
             )
-            return None
+            return False
         plugin.logger.info(
             f"[Proactive] Group {group_id} approved for participation | Reason: {reason}"
         )
 
-        reply_text = await plugin.llm_handler.call_generator_raw(
-            context_text, image_urls=all_image_urls, umo=event.unified_msg_origin
-        )
-        if not reply_text:
-            return None
-
-        # Trigger OnLLMResponseEvent event for plugin cooperation (e.g. meme_manager)
-        llm_response = LLMResponse(role="assistant", completion_text=reply_text)
-        await call_event_hook(event, EventType.OnLLMResponseEvent, llm_response)
-        reply_text = llm_response.completion_text
-
         rounds = plugin.tracker_manager.increment_proactive_rounds(group_id)
         max_rounds = plugin.config_helper.max_rounds()
         plugin.logger.info(
-            f"[Proactive] Speaking to group {group_id} (Round {rounds}/{max_rounds}): {reply_text[:60]}"
+            f"[Proactive] Speaking to group {group_id} natively (Round {rounds}/{max_rounds})"
         )
-        plugin.tracker_manager.set_proactive_flag(group_id, True)
-
-        result = MessageEventResult()
-        result.message(reply_text)
-        result.set_result_content_type(ResultContentType.LLM_RESULT)
-        try:
-            conv_mgr = plugin.context.conversation_manager
-            cid = await conv_mgr.get_curr_conversation_id(event.unified_msg_origin)
-            if cid:
-                global_cfg = plugin.context.get_config(umo=event.unified_msg_origin)
-                reminder = build_system_reminder(event, global_cfg)
-
-                parts = [TextPart(text=msg["content"])]
-                if reminder:
-                    parts.append(TextPart(text=reminder))
-
-                await conv_mgr.add_message_pair(
-                    cid=cid,
-                    user_message=UserMessageSegment(content=parts),
-                    assistant_message=AssistantMessageSegment(
-                        content=[TextPart(text=reply_text)]
-                    ),
-                )
-        except Exception as e:
-            plugin.logger.exception(
-                f"[Proactive] Failed to write conversation history: {e}"
-            )
-
-        # Start tracking group responses to this proactive message
-        await start_tracking(plugin, event, reply_text)
 
         plugin.tracker_manager.set_active_cooldown(group_id, time.time())
         if rounds >= max_rounds:
             plugin.logger.info(
                 f"[Proactive] Group {group_id} reached max rounds limit."
             )
-        plugin.tracker_manager.set_proactive_flag(group_id, False)
-        return result
+        return True
 
     except Exception as e:
         plugin.logger.exception(f"[Proactive] Error in handle_proactive: {e}")
-        return None
+        return False
     finally:
         plugin.tracker_manager.set_active_thinking(group_id, False)
-        plugin.tracker_manager.set_proactive_flag(group_id, False)
 
 
 async def handle_keyword(
@@ -433,95 +312,16 @@ async def handle_keyword(
     msg: dict,
     recent_window: list[dict],
     matched_keyword: str,
-) -> MessageEventResult | None:
-    """Process message under keyword trigger (Route 3)."""
+) -> bool:
+    """Process message under keyword trigger (Route 3).
+    Returns True if reply is triggered, False otherwise.
+    """
     group_id = str(event.get_group_id())
     try:
-        await ensure_context_captions(plugin, recent_window, event.unified_msg_origin)
-        context_lines = ["=== 群聊中的最近消息 ==="]
-        all_image_urls = []
-        for m in recent_window:
-            hints = []
-            if m.get("is_at_bot"):
-                hints.append("此消息@了你或提到了你的名字/ID")
-            elif m.get("is_at_other"):
-                hints.append("此消息@了或回复了其他人，不是你")
-            hint_str = f" (提示：{', '.join(hints)})" if hints else ""
-            context_lines.append(f"{m['user_name']}: {m['content']}{hint_str}")
-            if m.get("image_urls"):
-                all_image_urls.extend(m["image_urls"])
-        context_text = "\n".join(context_lines)
-
-        if plugin.config_helper.enable_image_caption():
-            all_image_urls = None
-
         plugin.logger.info(
-            f"[Keyword] Keyword '{matched_keyword}' matched in group {group_id}. Generating reply..."
+            f"[Keyword] Keyword '{matched_keyword}' matched in group {group_id}. Triggering native reply..."
         )
-
-        keyword_prompt_hint = f"\n[系统提示：用户提到关键词 '{matched_keyword}' 触发了你，请自然地进行接话。]"
-        enhanced_prompt = context_text + keyword_prompt_hint
-
-        if plugin.config_helper.enable_llm_tools():
-            reply_text = await plugin.llm_handler.call_generator_with_tools(
-                enhanced_prompt,
-                event=event,
-                image_urls=all_image_urls,
-                umo=event.unified_msg_origin,
-            )
-        else:
-            reply_text = await plugin.llm_handler.call_generator_raw(
-                enhanced_prompt, image_urls=all_image_urls, umo=event.unified_msg_origin
-            )
-
-        if not reply_text:
-            plugin.logger.warning(
-                f"[Keyword] Empty reply text generated for group {group_id}"
-            )
-            return None
-
-        # Trigger OnLLMResponseEvent event for plugin cooperation (e.g. meme_manager)
-        llm_response = LLMResponse(role="assistant", completion_text=reply_text)
-        await call_event_hook(event, EventType.OnLLMResponseEvent, llm_response)
-        reply_text = llm_response.completion_text
-
-        plugin.logger.info(f"[Keyword] Replying to group {group_id}: {reply_text[:60]}")
-        plugin.tracker_manager.set_proactive_flag(group_id, True)
-
-        result = MessageEventResult()
-        result.message(reply_text)
-        result.set_result_content_type(ResultContentType.LLM_RESULT)
-        try:
-            conv_mgr = plugin.context.conversation_manager
-            cid = await conv_mgr.get_curr_conversation_id(event.unified_msg_origin)
-            if cid:
-                global_cfg = plugin.context.get_config(umo=event.unified_msg_origin)
-                reminder = build_system_reminder(event, global_cfg)
-
-                parts = [TextPart(text=msg["content"])]
-                if reminder:
-                    parts.append(TextPart(text=reminder))
-
-                await conv_mgr.add_message_pair(
-                    cid=cid,
-                    user_message=UserMessageSegment(content=parts),
-                    assistant_message=AssistantMessageSegment(
-                        content=[TextPart(text=reply_text)]
-                    ),
-                )
-        except Exception as e:
-            plugin.logger.exception(
-                f"[Keyword] Failed to write conversation history: {e}"
-            )
-
-        # Start tracking group responses to this keyword reply
-        await start_tracking(plugin, event, reply_text)
-
-        plugin.tracker_manager.set_proactive_flag(group_id, False)
-        return result
-
+        return True
     except Exception as e:
         plugin.logger.exception(f"[Keyword] Error in handle_keyword: {e}")
-        return None
-    finally:
-        plugin.tracker_manager.set_proactive_flag(group_id, False)
+        return False
