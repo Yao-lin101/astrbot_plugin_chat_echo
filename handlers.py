@@ -12,6 +12,9 @@ from astrbot.core.message.message_event_result import (
     MessageEventResult,
     ResultContentType,
 )
+from astrbot.core.pipeline.context_utils import call_event_hook
+from astrbot.core.provider.entities import LLMResponse
+from astrbot.core.star.star_handler import EventType
 
 from .helpers import extract_image_urls
 from .tracker import ConversationTracker
@@ -188,6 +191,11 @@ async def handle_reply(
             )
             return None
 
+        # Trigger OnLLMResponseEvent event for plugin cooperation (e.g. meme_manager)
+        llm_response = LLMResponse(role="assistant", completion_text=reply_text)
+        await call_event_hook(event, EventType.OnLLMResponseEvent, llm_response)
+        reply_text = llm_response.completion_text
+
         plugin.logger.info(f"[Reply] Replying to group {group_id}: {reply_text[:60]}")
         plugin.tracker_manager.set_proactive_flag(group_id, True)
 
@@ -297,6 +305,11 @@ async def handle_proactive(
         )
         if not reply_text:
             return None
+
+        # Trigger OnLLMResponseEvent event for plugin cooperation (e.g. meme_manager)
+        llm_response = LLMResponse(role="assistant", completion_text=reply_text)
+        await call_event_hook(event, EventType.OnLLMResponseEvent, llm_response)
+        reply_text = llm_response.completion_text
 
         rounds = plugin.tracker_manager.increment_proactive_rounds(group_id)
         max_rounds = plugin.config_helper.max_rounds()
