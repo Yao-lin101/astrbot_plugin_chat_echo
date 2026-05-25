@@ -12,9 +12,6 @@ from astrbot.core.message.message_event_result import (
     MessageEventResult,
     ResultContentType,
 )
-from astrbot.core.pipeline.context_utils import call_event_hook
-from astrbot.core.provider.entities import LLMResponse
-from astrbot.core.star.star_handler import EventType
 
 from .helpers import extract_image_urls
 from .tracker import ConversationTracker
@@ -360,97 +357,4 @@ async def handle_proactive(
         return None
     finally:
         plugin.tracker_manager.set_active_thinking(group_id, False)
-        plugin.tracker_manager.set_proactive_flag(group_id, False)
-
-
-async def handle_keyword(
-    plugin,
-    event: AstrMessageEvent,
-    msg: dict,
-    recent_window: list[dict],
-    matched_keyword: str,
-) -> MessageEventResult | None:
-    """Process message under keyword trigger (Route 3)."""
-    group_id = str(event.get_group_id())
-    try:
-        context_lines = ["=== 群聊中的最近消息 ==="]
-        all_image_urls = []
-        for m in recent_window:
-            context_lines.append(f"{m['user_name']}: {m['content']}")
-            if m.get("image_urls"):
-                all_image_urls.extend(m["image_urls"])
-        context_text = "\n".join(context_lines)
-
-        if plugin.config_helper.enable_image_caption():
-            all_image_urls = None
-
-        plugin.logger.info(
-            f"[Keyword] Keyword '{matched_keyword}' matched in group {group_id}. Generating reply..."
-        )
-
-        keyword_prompt_hint = f"\n[系统提示：用户提到关键词 '{matched_keyword}' 触发了你，请自然地进行接话。]"
-        enhanced_prompt = context_text + keyword_prompt_hint
-
-        if plugin.config_helper.enable_llm_tools():
-            reply_text = await plugin.llm_handler.call_generator_with_tools(
-                enhanced_prompt,
-                event=event,
-                image_urls=all_image_urls,
-                umo=event.unified_msg_origin,
-            )
-        else:
-            reply_text = await plugin.llm_handler.call_generator_raw(
-                enhanced_prompt, image_urls=all_image_urls, umo=event.unified_msg_origin
-            )
-
-        if not reply_text:
-            plugin.logger.warning(
-                f"[Keyword] Empty reply text generated for group {group_id}"
-            )
-            return None
-
-        # Trigger OnLLMResponseEvent event for plugin cooperation (e.g. meme_manager)
-        llm_response = LLMResponse(role="assistant", completion_text=reply_text)
-        await call_event_hook(event, EventType.OnLLMResponseEvent, llm_response)
-        reply_text = llm_response.completion_text
-
-        plugin.logger.info(f"[Keyword] Replying to group {group_id}: {reply_text[:60]}")
-        plugin.tracker_manager.set_proactive_flag(group_id, True)
-
-        result = MessageEventResult()
-        result.message(reply_text)
-        result.set_result_content_type(ResultContentType.LLM_RESULT)
-        try:
-            conv_mgr = plugin.context.conversation_manager
-            cid = await conv_mgr.get_curr_conversation_id(event.unified_msg_origin)
-            if cid:
-                global_cfg = plugin.context.get_config(umo=event.unified_msg_origin)
-                reminder = build_system_reminder(event, global_cfg)
-
-                parts = [TextPart(text=msg["content"])]
-                if reminder:
-                    parts.append(TextPart(text=reminder))
-
-                await conv_mgr.add_message_pair(
-                    cid=cid,
-                    user_message=UserMessageSegment(content=parts),
-                    assistant_message=AssistantMessageSegment(
-                        content=[TextPart(text=reply_text)]
-                    ),
-                )
-        except Exception as e:
-            plugin.logger.exception(
-                f"[Keyword] Failed to write conversation history: {e}"
-            )
-
-        # Start tracking group responses to this keyword reply
-        await start_tracking(plugin, event, reply_text)
-
-        plugin.tracker_manager.set_proactive_flag(group_id, False)
-        return result
-
-    except Exception as e:
-        plugin.logger.exception(f"[Keyword] Error in handle_keyword: {e}")
-        return None
-    finally:
         plugin.tracker_manager.set_proactive_flag(group_id, False)

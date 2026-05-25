@@ -126,29 +126,12 @@ def parse_group_entry(entry: str) -> tuple[str, int | None, int | None]:
         return group_id, reply_p, active_p
 
 
-def parse_keyword_rule(entry: str) -> tuple[str, int | None]:
-    """Parse a keyword rule entry."""
-    entry = entry.strip()
-    if not entry:
-        return "", None
-    if ":" in entry:
-        parts = entry.rsplit(":", 1)
-        keyword = parts[0].strip()
-        prob_str = parts[1].strip()
-        if prob_str.isdigit():
-            return keyword, int(prob_str)
-        else:
-            return entry, None
-    return entry, None
-
-
 class ConfigHelper:
     """Helper to manage and access configuration parameters."""
 
     def __init__(self, config):
         self.config = config
         self.parsed_groups: list[tuple[str, int | None, int | None]] = []
-        self.parsed_keywords: list[tuple[str, int | None]] = []
         self.refresh()
 
     def refresh(self):
@@ -156,11 +139,6 @@ class ConfigHelper:
         enabled = self.enabled_groups()
         self.parsed_groups = [
             parse_group_entry(entry) for entry in enabled if entry.strip()
-        ]
-
-        keywords = self.keyword_rules()
-        self.parsed_keywords = [
-            parse_keyword_rule(entry) for entry in keywords if entry.strip()
         ]
 
     def cfg(self, key: str, default=None):
@@ -172,15 +150,6 @@ class ConfigHelper:
 
     def trigger_mode(self) -> str:
         return str(self.cfg("trigger_mode", "llm_response"))
-
-    def enable_keyword_trigger(self) -> bool:
-        return bool(self.cfg("enable_keyword_trigger", False))
-
-    def keyword_rules(self) -> list:
-        return self.cfg("keyword_rules", [])
-
-    def keyword_default_probability(self) -> int:
-        return int(self.cfg("keyword_default_probability", 100))
 
     def track_timeout(self) -> int:
         return int(self.cfg("track_timeout_seconds", 120))
