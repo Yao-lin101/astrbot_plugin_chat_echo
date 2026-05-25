@@ -12,6 +12,9 @@ from astrbot.core.message.message_event_result import (
     MessageEventResult,
     ResultContentType,
 )
+from astrbot.core.pipeline.context_utils import call_event_hook
+from astrbot.core.provider.entities import LLMResponse
+from astrbot.core.star.star_handler import EventType
 
 from .helpers import extract_image_urls
 from .tracker import ConversationTracker
@@ -382,6 +385,7 @@ async def handle_proactive(
     finally:
         plugin.tracker_manager.set_active_thinking(group_id, False)
         plugin.tracker_manager.set_proactive_flag(group_id, False)
+
 
 async def handle_keyword(
     plugin,
