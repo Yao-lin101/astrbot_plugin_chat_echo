@@ -23,6 +23,7 @@ from .helpers import (
 )
 from .llm_client import LLMHandler
 from .tracker import TrackerManager
+from .utils.caption_cache import ImageCaptionCache
 from .utils.token_counter import TokenCounter
 
 PLUGIN_NAME = "astrbot_plugin_chat_echo"
@@ -38,6 +39,7 @@ class EchoPlugin(Star):
 
         data_dir = StarTools.get_data_dir("chat_echo")
         self.token_counter = TokenCounter(data_dir)
+        self.caption_cache = ImageCaptionCache(Path(data_dir))
 
         # Upgrade config prompts and initialize config helper
         upgrade_config(self.config, Path(data_dir), self.logger)
@@ -254,6 +256,15 @@ class EchoPlugin(Star):
 
     async def get_image_caption(self, image_url: str, umo: str) -> str:
         """Call LLM provider to get description/caption for a given image URL."""
+        # Query cache first
+        img_hash = await self.caption_cache.get_hash(image_url)
+        cached = self.caption_cache.get(img_hash)
+        if cached:
+            self.logger.info(
+                f"[ImageCache] Hit cache for image {image_url[:60]}... -> {cached[:30]}"
+            )
+            return cached
+
         provider_id = self.config_helper.image_caption_provider()
         global_cfg = self.context.get_config(umo=umo)
 
@@ -284,7 +295,9 @@ class EchoPlugin(Star):
             )
             resp = await prov.text_chat(prompt=prompt, image_urls=[image_url])
             if resp and resp.completion_text:
-                return resp.completion_text.strip()
+                caption = resp.completion_text.strip()
+                self.caption_cache.set(img_hash, caption)
+                return caption
         except Exception as e:
             self.logger.exception(f"Failed to get image caption: {e}")
 
