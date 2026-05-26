@@ -503,17 +503,33 @@ class EchoPlugin(Star):
             "image_caption_prompt", "Please describe the image using Chinese."
         )
 
+        compressed_url = image_url
+        is_temp_file = False
         try:
+            import os
+            from .helpers import compress_image_if_needed
+            compressed_url = await compress_image_if_needed(image_url)
+            if image_url.startswith("http://") or image_url.startswith("https://"):
+                is_temp_file = True
+            elif compressed_url != image_url:
+                is_temp_file = True
+
             self.logger.debug(
-                f"Requesting image caption from provider {provider_id} for URL {image_url}"
+                f"Requesting image caption from provider {provider_id} for URL {compressed_url}"
             )
-            resp = await prov.text_chat(prompt=prompt, image_urls=[image_url])
+            resp = await prov.text_chat(prompt=prompt, image_urls=[compressed_url])
             if resp and resp.completion_text:
                 caption = resp.completion_text.strip()
                 self.caption_cache.set(img_hash, caption)
                 return caption
         except Exception as e:
             self.logger.exception(f"Failed to get image caption: {e}")
+        finally:
+            if is_temp_file and compressed_url and os.path.exists(compressed_url):
+                try:
+                    os.unlink(compressed_url)
+                except Exception:
+                    pass
 
         return ""
 
