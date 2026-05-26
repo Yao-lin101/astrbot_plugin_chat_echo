@@ -139,9 +139,12 @@ class EchoPlugin(Star):
             content = msg["content"]
             if role == "user":
                 content = f"{msg['user_name']}: {content}"
-            injected_contexts.append({"role": role, "content": content})
+            injected_contexts.append(
+                {"role": role, "content": content, "_no_save": True}
+            )
 
         if injected_contexts:
+            event.set_extra("chat_echo_original_contexts", req.contexts)
             req.contexts = injected_contexts
             self.logger.debug(
                 f"[ChatEcho] Overwrote LLM contexts with {len(injected_contexts)} tracked group messages."
@@ -155,6 +158,40 @@ class EchoPlugin(Star):
                 if req.system_prompt is None:
                     req.system_prompt = ""
                 req.system_prompt += keyword_hint
+
+    @filter.on_agent_done()
+    async def on_agent_done(
+        self,
+        event: AstrMessageEvent,
+        run_context,
+        response,
+    ) -> None:
+        """Restore original conversation history before it is saved to the database."""
+        if not event.get_extra("chat_echo_triggered"):
+            return
+
+        original_contexts = event.get_extra("chat_echo_original_contexts")
+        if original_contexts is None:
+            return
+
+        from astrbot.core.agent.message import bind_checkpoint_messages
+
+        # Reconstruct the messages list starting with original history
+        restored_messages = []
+        if run_context.messages and run_context.messages[0].role == "system":
+            restored_messages.append(run_context.messages[0])
+
+        restored_messages.extend(bind_checkpoint_messages(original_contexts))
+
+        # Append new user prompt and assistant response, filtering out injected contexts
+        for msg in run_context.messages:
+            if msg.role == "system":
+                continue
+            if msg.role in ["user", "assistant"] and getattr(msg, "_no_save", False):
+                continue
+            restored_messages.append(msg)
+
+        run_context.messages = restored_messages
 
     @filter.after_message_sent()
     async def on_after_message_sent(self, event: AstrMessageEvent):
