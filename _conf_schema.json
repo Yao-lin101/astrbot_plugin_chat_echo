@@ -169,13 +169,5 @@
     "default": "你是一个群聊观察者。请分析以下群聊内容，判断Bot是否应该参与讨论。\n\n判断标准：\n1. 群消息中提到的话题Bot是否了解或有见解\n2. 对话是否在邀请更多人参与（提问、征求意见等）\n3. Bot是否有想说的内容（吐槽、补充、提问、分享等）\n4. 只要是Bot有内容想回复，就回复\"yes\"\n5. 只有Bot完全无话可说时才回复\"no\"\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"should_join\": \"yes|no\",\n  \"reason\": \"简短的原因说明\"\n}",
     "editor_mode": true,
     "editor_language": "markdown"
-  },
-  "generator_system_prompt": {
-    "type": "text",
-    "description": "【回复生成】LLM 系统提示词",
-    "hint": "用于生成主动回复内容的LLM提示词。控制Bot的回复风格、长度和语气",
-    "default": "你正在参与群聊讨论，请自然地接上对话。记住你是群里的一个成员，不是AI助手。\n\n【回复要求】\n- 回复要简短，一两句话就行，不要长篇大论\n- 口语化，像真人聊天那样\n- 结合Bot刚才说的内容和群友的回复来回应\n- 可以适当使用工具、搜索、发图等来丰富回复\n- 不要输出思考过程\n- 不要长篇说教或分析",
-    "editor_mode": true,
-    "editor_language": "markdown"
   }
 }

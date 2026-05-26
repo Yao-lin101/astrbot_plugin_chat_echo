@@ -10,7 +10,9 @@ from pathlib import Path
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.event.filter import EventMessageType
+from astrbot.api.message_components import At, Reply
 from astrbot.api.star import Context, Star, StarTools, register
+from astrbot.core.provider.entities import ProviderRequest
 
 from .config import ConfigHelper, upgrade_config
 from .handlers import handle_keyword, handle_proactive, handle_reply, start_tracking
@@ -81,9 +83,78 @@ class EchoPlugin(Star):
             return
         if self.tracker_manager.is_proactive_flagged(group_id):
             return
+
+        chat_echo_triggered = event.get_extra("chat_echo_triggered")
         bot_text = extract_bot_text(response)
+
+        if chat_echo_triggered:
+            self.tracker_manager.set_active_thinking(group_id, False)
+            tracker = self.tracker_manager.get_tracker(group_id)
+            if tracker and tracker.alive:
+                tracker.collected.append(
+                    {
+                        "user_name": "你",
+                        "user_id": "bot",
+                        "content": bot_text,
+                        "image_urls": [],
+                        "time": time.time(),
+                        "is_at_bot": False,
+                    }
+                )
+                tracker.detection_count = 0
+                tracker.expire_at = time.time() + self.config_helper.track_timeout()
+            else:
+                await start_tracking(self, event, bot_text)
+            return
+
         if self.config_helper.trigger_mode() in ("llm_response", "any_message"):
             await start_tracking(self, event, bot_text)
+
+    @filter.on_llm_request()
+    async def on_llm_request(
+        self, event: AstrMessageEvent, req: ProviderRequest
+    ) -> None:
+        """Inject tracked conversation history before LLM request is sent."""
+        if not event.get_extra("chat_echo_triggered"):
+            return
+
+        group_id = str(event.get_group_id())
+        tracker = self.tracker_manager.get_tracker(group_id)
+
+        recent_msgs = []
+        if tracker:
+            recent_msgs = tracker.collected
+        else:
+            recent_msgs = self.tracker_manager.get_recent(group_id) or []
+
+        injected_contexts = []
+        msgs_to_inject = recent_msgs[:-1] if recent_msgs else []
+
+        for msg in msgs_to_inject:
+            role = (
+                "assistant"
+                if msg["user_name"] == "你" or msg["user_id"] == "bot"
+                else "user"
+            )
+            content = msg["content"]
+            if role == "user":
+                content = f"{msg['user_name']}: {content}"
+            injected_contexts.append({"role": role, "content": content})
+
+        if injected_contexts:
+            req.contexts = injected_contexts
+            self.logger.debug(
+                f"[ChatEcho] Overwrote LLM contexts with {len(injected_contexts)} tracked group messages."
+            )
+
+        mode = event.get_extra("chat_echo_mode")
+        if mode == "keyword":
+            matched_keyword = event.get_extra("chat_echo_matched_keyword")
+            if matched_keyword:
+                keyword_hint = f"\n\n[系统提示：用户提到关键词 '{matched_keyword}' 触发了你，请自然地进行接话。]"
+                if req.system_prompt is None:
+                    req.system_prompt = ""
+                req.system_prompt += keyword_hint
 
     @filter.after_message_sent()
     async def on_after_message_sent(self, event: AstrMessageEvent):
@@ -123,6 +194,51 @@ class EchoPlugin(Star):
         except (AttributeError, TypeError, ValueError):
             pass
 
+        # Check if the message is @ing the bot (by ID or name) or mentioning the bot's name/ID
+        is_at_bot = False
+        is_at_other = False
+        msg_text = event.message_str or ""
+        self_id = event.get_self_id()
+
+        persona_name = ""
+        try:
+            personality = await self.context.persona_manager.get_default_persona_v3(umo)
+            if personality:
+                persona_name = personality.get("name") or ""
+        except Exception:
+            pass
+
+        # 1. Check message components
+        for comp in event.get_messages():
+            if isinstance(comp, At):
+                if str(comp.qq) == str(self_id):
+                    is_at_bot = True
+                elif (
+                    persona_name
+                    and persona_name != "default"
+                    and comp.name
+                    and persona_name.lower() in comp.name.lower()
+                ):
+                    is_at_bot = True
+                elif str(comp.qq) != "all":
+                    is_at_other = True
+            elif isinstance(comp, Reply):
+                if str(comp.sender_id) == str(self_id):
+                    is_at_bot = True
+                else:
+                    is_at_other = True
+
+        # 2. Check if the text contains bot's name/nickname or self_id
+        if not is_at_bot:
+            if self_id and str(self_id) in msg_text:
+                is_at_bot = True
+            elif (
+                persona_name
+                and persona_name != "default"
+                and persona_name.lower() in msg_text.lower()
+            ):
+                is_at_bot = True
+
         msg_content = event.message_str or ""
         if not msg_content.strip():
             msg_content = event.get_message_outline()
@@ -141,12 +257,18 @@ class EchoPlugin(Star):
             if captions:
                 msg_content += " " + " ".join(f"[图片描述: {cap}]" for cap in captions)
 
+        user_name = event.get_sender_name()
+        if is_bot:
+            user_name = "你"
+
         msg = {
-            "user_name": event.get_sender_name(),
+            "user_name": user_name,
             "user_id": str(event.get_sender_id()),
             "content": msg_content,
             "image_urls": image_urls,
             "time": now,
+            "is_at_bot": is_at_bot,
+            "is_at_other": is_at_other and not is_at_bot,
         }
 
         window = self.tracker_manager.add_to_recent(
@@ -189,7 +311,17 @@ class EchoPlugin(Star):
                                 self, event, msg, window, matched_keyword
                             )
                             if res:
-                                return res
+                                event.is_at_or_wake_command = True
+                                event.set_extra("chat_echo_triggered", True)
+                                event.set_extra("chat_echo_mode", "keyword")
+                                event.set_extra(
+                                    "chat_echo_matched_keyword", matched_keyword
+                                )
+                                event.set_extra(
+                                    "selected_provider",
+                                    self.config_helper.generator_provider(),
+                                )
+                                return None
                         finally:
                             self.tracker_manager.set_active_thinking(group_id, False)
                 else:
@@ -213,7 +345,17 @@ class EchoPlugin(Star):
                     self.config_helper.get_effective_reply_prob(group_id, umo)
                 ):
                     tracker.analyzing = True
-                    return await handle_reply(self, tracker, event)
+                    res = await handle_reply(self, tracker, event)
+                    if res:
+                        event.is_at_or_wake_command = True
+                        event.set_extra("chat_echo_triggered", True)
+                        event.set_extra("chat_echo_mode", "reply")
+                        event.set_extra(
+                            "selected_provider", self.config_helper.generator_provider()
+                        )
+                        self.tracker_manager.set_active_thinking(group_id, True)
+                        return None
+                    return
                 return
 
         # ====== Proactive Mode (Route 2) ======
@@ -234,7 +376,17 @@ class EchoPlugin(Star):
             return
         if is_probability_hit(active_prob):
             self.tracker_manager.set_active_thinking(group_id, True)
-            return await handle_proactive(self, event, msg, window)
+            res = await handle_proactive(self, event, msg, window)
+            if res:
+                event.is_at_or_wake_command = True
+                event.set_extra("chat_echo_triggered", True)
+                event.set_extra("chat_echo_mode", "proactive")
+                event.set_extra(
+                    "selected_provider", self.config_helper.generator_provider()
+                )
+                return None
+            else:
+                self.tracker_manager.set_active_thinking(group_id, False)
 
     async def page_token_stats(self):
         try:
