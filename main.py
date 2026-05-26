@@ -142,11 +142,9 @@ class EchoPlugin(Star):
             injected_contexts.append({"role": role, "content": content})
 
         if injected_contexts:
-            if req.contexts is None:
-                req.contexts = []
-            req.contexts = injected_contexts + req.contexts
+            req.contexts = injected_contexts
             self.logger.debug(
-                f"[ChatEcho] Injected {len(injected_contexts)} messages into LLM contexts."
+                f"[ChatEcho] Overwrote LLM contexts with {len(injected_contexts)} tracked group messages."
             )
 
         mode = event.get_extra("chat_echo_mode")
