@@ -130,6 +130,7 @@ Bot 发言 → 开始跟踪窗口 → 群友回复 → LLM 分析是否回复 Bo
 ## 作者
 
 - [AMYdd00](https://github.com/AMYdd00)
+- [Yao-lin101](https://github.com/Yao-lin101)
 
 > 本插件代码完全由 AI 生成。
 
