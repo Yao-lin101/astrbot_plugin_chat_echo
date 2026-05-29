@@ -251,26 +251,45 @@ function renderItem(item,index){
   el.dataset.hash=item.img_hash;
   el.style.animationDelay=`${index*0.04}s`;
 
+  // Create preview container dynamically to prevent backend path rewriting from mangling template placeholders
+  const previewEl=document.createElement('div');
+  previewEl.className='img-preview';
+  
   const hasUrl=item.image_url&&(item.image_url.startsWith('http')||item.image_url.startsWith('/'));
-  const imgHtml=hasUrl
-    ?`<div class="img-preview" onclick="openLightbox('${item.image_url.replace(/'/g,"\\'")}')"><img src="${item.image_url}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'no-img\\'>🖼️</div><div class=\\'no-img-label\\'>加载失败</div>'"></div>`
-    :`<div class="img-preview"><div class="no-img">🖼️</div><div class="no-img-label">URL 未记录</div></div>`;
+  if(hasUrl){
+    previewEl.onclick=()=>openLightbox(item.image_url);
+    const img=document.createElement('img');
+    img.src=item.image_url;
+    img.loading='lazy';
+    img.onerror=()=>{
+      previewEl.innerHTML='<div class="no-img">🖼️</div><div class="no-img-label">加载失败</div>';
+    };
+    previewEl.appendChild(img);
+  }else{
+    previewEl.innerHTML='<div class="no-img">🖼️</div><div class="no-img-label">URL 未记录</div>';
+  }
+  el.appendChild(previewEl);
 
   const hashShort=item.img_hash.length>12?item.img_hash.slice(0,12)+'…':item.img_hash;
 
-  el.innerHTML=`
-    ${imgHtml}
-    <div class="item-content">
-      <div class="item-caption" data-hash="${item.img_hash}" onclick="startEdit(this)" title="点击编辑">${escapeHtml(item.caption||'(无转述内容)')}</div>
-      <div class="item-meta">
-        <span class="hash" title="${item.img_hash}">${hashShort}</span>
-        <span>📅 ${fmtDate(item.created_at)}</span>
-      </div>
-    </div>
-    <div class="item-actions">
-      <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.img_hash}',this)">删除</button>
+  const contentEl=document.createElement('div');
+  contentEl.className='item-content';
+  contentEl.innerHTML=`
+    <div class="item-caption" data-hash="${item.img_hash}" onclick="startEdit(this)" title="点击编辑">${escapeHtml(item.caption||'(无转述内容)')}</div>
+    <div class="item-meta">
+      <span class="hash" title="${item.img_hash}">${hashShort}</span>
+      <span>📅 ${fmtDate(item.created_at)}</span>
     </div>
   `;
+  el.appendChild(contentEl);
+
+  const actionsEl=document.createElement('div');
+  actionsEl.className='item-actions';
+  actionsEl.innerHTML=`
+    <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.img_hash}',this)">删除</button>
+  `;
+  el.appendChild(actionsEl);
+
   return el;
 }
 
