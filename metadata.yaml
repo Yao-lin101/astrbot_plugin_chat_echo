@@ -3,7 +3,7 @@ display_name: 主动接话插件
 author: "AMYdd00, Yao-lin101"
 desc: "智能群聊主动接话与关键词监听回复插件。支持回复模式、主动参与模式和兴趣关键词检测。自带SQLite图片转述哈希缓存及Token用量统计面板。"
 short_desc: "智能群聊主动接话与关键词监听回复插件"
-version: "1.0.6"
+version: "1.1.0"
 
 repo: "https://github.com/AMYdd00/astrbot_plugin_chat_echo"
 support_platforms:
