@@ -66,6 +66,7 @@ header .sub{font-size:18px;color:var(--text2)}
 </div></div>
 <div class="segment-control">
 <button class="seg" data-period="day">今日</button>
+<button class="seg" data-period="yesterday">昨日</button>
 <button class="seg" data-period="week">本周</button>
 <button class="seg active" data-period="month">本月</button>
 <button class="seg" data-period="year">近一年</button>
@@ -83,7 +84,7 @@ const B=window.AstrBotPluginPage;
 if(!B){document.body.innerHTML='<div class="container"><div class="empty-state"><div class="icon">⚠️</div><div>Bridge not available</div></div></div>'}else{await B.ready();
 (function(){const m=window.matchMedia('(prefers-color-scheme:dark)');function s(d){document.documentElement.setAttribute('data-theme',d?'dark':'light')}s(m.matches);m.addEventListener('change',e=>s(e.matches))})();
 const PALETTE=['#0071e3','#ff2d55','#34c759','#ff9500','#5856d6','#ff6482','#00c7be','#af52de','#ffd60a','#30b0c7','#ff9f0a','#bf5af2','#64d2ff','#ff453a','#32d74b'];
-const $=s=>document.querySelector(s);const totalNum=$('#totalNum'),promptEl=$('#promptTotal'),compEl=$('#compTotal'),groupCnt=$('#groupCount'),chart=$('#chart'),legend=$('#legend'),rankList=$('#rankList'),segs=document.querySelectorAll('.seg');let curPeriod='month';const hiddenSet=new Set();
+const $=s=>document.querySelector(s);const totalNum=$('#totalNum'),promptEl=$('#promptTotal'),compEl=$('#compTotal'),groupCnt=$('#groupCount'),chart=$('#chart'),legend=$('#legend'),rankList=$('#rankList'),segs=document.querySelectorAll('.seg');let curPeriod='month';const hiddenSet=new Set();const PERIOD_DAYS={day:1,yesterday:2,week:7,month:31,year:365,all:365};
 function fmt(n){if(n==null)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e4)return(n/1e4).toFixed(1)+'万';return n.toLocaleString()}
 function fmtFull(n){if(n==null)return'0';return n.toLocaleString()}
 function drawChart(allGroups){if(!allGroups||!allGroups.length){chart.innerHTML='<text x="500" y="165" text-anchor="middle" fill="var(--text3)" font-size="14">暂无数据</text>';legend.innerHTML='';return}
@@ -100,7 +101,7 @@ const mv=groups[0].total||1;let h='';groups.forEach((g,i)=>{const p=mv>0?g.total
 rankList.innerHTML=h;requestAnimationFrame(()=>{document.querySelectorAll('.rank-item').forEach((el,i)=>{el.classList.add('visible');const bar=el.querySelector('.rank-bar-fill'),pct=groups[i]?groups[i].total/mv*100:0;setTimeout(()=>{bar.style.width=pct+'%'},100+i*50)})})}
 async function update(p){curPeriod=p;segs.forEach(s=>s.classList.toggle('active',s.dataset.period===p));try{
 const sr=await B.apiGet('token_stats',{period:p}),sd=sr&&sr.data?sr.data:sr;if(!sd)throw'No data';const g=sd.global||{},gr=sd.groups||[];totalNum.textContent=fmtFull(g.total||0);promptEl.textContent=fmtFull(g.prompt||0);compEl.textContent=fmtFull(g.completion||0);groupCnt.textContent=g.group_count||0
-const hr=await B.apiGet('token_history',{days:30}),hd=hr&&hr.data?hr.data:hr;drawChart((hd&&hd.groups)||[]);renderRank(gr)
+const days=PERIOD_DAYS[p]||30;const hr=await B.apiGet('token_history',{days}),hd=hr&&hr.data?hr.data:hr;drawChart((hd&&hd.groups)||[]);renderRank(gr)
 }catch(e){totalNum.textContent='—';promptEl.textContent='—';compEl.textContent='—';groupCnt.textContent='—';chart.innerHTML='<text x="500" y="165" text-anchor="middle" fill="var(--text3)" font-size="14">加载失败</text>'}}
 segs.forEach(s=>s.addEventListener('click',()=>update(s.dataset.period)));
 const obs=new IntersectionObserver(e=>e.forEach(i=>{if(i.isIntersecting)i.target.classList.add('visible')}),{threshold:.1});document.querySelectorAll('.chart-card,.rank-section h2').forEach(el=>obs.observe(el));

@@ -133,6 +133,8 @@ class TokenCounter:
         today = date.today()
         if period == "day":
             return str(today), str(today)
+        elif period == "yesterday":
+            return str(today - timedelta(days=1)), str(today - timedelta(days=1))
         elif period == "week":
             start = today - timedelta(days=today.weekday())
             return str(start), str(today)
