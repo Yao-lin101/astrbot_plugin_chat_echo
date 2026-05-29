@@ -30,6 +30,13 @@ class ImageCaptionCache:
                 )
                 """
             )
+            # Auto-migrate: add image_url column if it doesn't exist
+            cursor.execute("PRAGMA table_info(caption_cache)")
+            columns = {row[1] for row in cursor.fetchall()}
+            if "image_url" not in columns:
+                cursor.execute(
+                    "ALTER TABLE caption_cache ADD COLUMN image_url TEXT DEFAULT ''"
+                )
             conn.commit()
             conn.close()
         except Exception as e:
@@ -76,16 +83,123 @@ class ImageCaptionCache:
             logger.error(f"Failed to query caption cache: {e}")
         return None
 
-    def set(self, img_hash: str, caption: str):
+    def set(self, img_hash: str, caption: str, image_url: str = ""):
         """Insert or replace a cached caption in SQLite database."""
         try:
             conn = sqlite3.connect(str(self.db_path))
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT OR REPLACE INTO caption_cache (img_hash, caption, created_at) VALUES (?, ?, ?)",
-                (img_hash, caption, time.time()),
+                "INSERT OR REPLACE INTO caption_cache (img_hash, caption, created_at, image_url) VALUES (?, ?, ?, ?)",
+                (img_hash, caption, time.time(), image_url),
             )
             conn.commit()
             conn.close()
         except Exception as e:
             logger.error(f"Failed to write to caption cache: {e}")
+
+    def get_all(self, offset: int = 0, limit: int = 20) -> list[dict]:
+        """Retrieve paginated cache entries, ordered by creation time descending."""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT img_hash, caption, created_at, image_url FROM caption_cache ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            return [
+                {
+                    "img_hash": row[0],
+                    "caption": row[1],
+                    "created_at": row[2],
+                    "image_url": row[3] or "",
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to query caption cache list: {e}")
+            return []
+
+    def get_count(self) -> int:
+        """Return total number of cached entries."""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM caption_cache")
+            count = cursor.fetchone()[0]
+            conn.close()
+            return count
+        except Exception as e:
+            logger.error(f"Failed to get caption cache count: {e}")
+            return 0
+
+    def get_db_size(self) -> int:
+        """Return database file size in bytes."""
+        try:
+            if self.db_path.exists():
+                return self.db_path.stat().st_size
+        except Exception as e:
+            logger.error(f"Failed to get caption cache DB size: {e}")
+        return 0
+
+    def delete(self, img_hash: str) -> bool:
+        """Delete a single cache entry by hash."""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM caption_cache WHERE img_hash = ?", (img_hash,))
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return deleted
+        except Exception as e:
+            logger.error(f"Failed to delete caption cache entry: {e}")
+            return False
+
+    def delete_before(self, timestamp: float) -> int:
+        """Delete all cache entries created before the given timestamp. Returns the number of deleted entries."""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM caption_cache WHERE created_at < ?", (timestamp,)
+            )
+            deleted = cursor.rowcount
+            conn.commit()
+            conn.close()
+            return deleted
+        except Exception as e:
+            logger.error(f"Failed to delete old caption cache entries: {e}")
+            return 0
+
+    def clear(self) -> int:
+        """Clear all cache entries. Returns the number of deleted entries."""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM caption_cache")
+            deleted = cursor.rowcount
+            conn.commit()
+            conn.close()
+            return deleted
+        except Exception as e:
+            logger.error(f"Failed to clear caption cache: {e}")
+            return 0
+
+    def update_caption(self, img_hash: str, new_caption: str) -> bool:
+        """Update the caption text for a given image hash."""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE caption_cache SET caption = ? WHERE img_hash = ?",
+                (new_caption, img_hash),
+            )
+            updated = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return updated
+        except Exception as e:
+            logger.error(f"Failed to update caption cache: {e}")
+            return False

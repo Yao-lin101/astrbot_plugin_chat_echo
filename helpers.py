@@ -82,10 +82,10 @@ async def compress_image_if_needed(image_url: str) -> str:
 
     temp_dir = Path(get_astrbot_temp_path())
     temp_dir.mkdir(parents=True, exist_ok=True)
-    
+
     is_downloaded = False
     local_path = None
-    
+
     try:
         if image_url.startswith("http://") or image_url.startswith("https://"):
             local_path = await download_image_by_url(image_url)
@@ -95,38 +95,40 @@ async def compress_image_if_needed(image_url: str) -> str:
             local_path = path_str
         else:
             local_path = image_url
-            
+
         if not local_path or not os.path.exists(local_path):
             return image_url
-            
+
         file_size = os.path.getsize(local_path)
-        
+
         with PILImage.open(local_path) as img:
             width, height = img.size
-            
+
         MAX_DIMENSION = 1536
         MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB
-        
+
         if file_size <= MAX_FILE_SIZE and max(width, height) <= MAX_DIMENSION:
             if is_downloaded:
                 return local_path
             return image_url
-            
+
         with PILImage.open(local_path) as img:
             if img.mode != "RGB":
                 img = img.convert("RGB")
             if max(width, height) > MAX_DIMENSION:
-                img.thumbnail((MAX_DIMENSION, MAX_DIMENSION), PILImage.Resampling.LANCZOS)
-                
+                img.thumbnail(
+                    (MAX_DIMENSION, MAX_DIMENSION), PILImage.Resampling.LANCZOS
+                )
+
             compressed_path = temp_dir / f"chat_echo_compressed_{uuid.uuid4().hex}.jpg"
             img.save(compressed_path, format="JPEG", quality=85, optimize=True)
-            
+
             if is_downloaded and local_path != str(compressed_path):
                 try:
                     os.unlink(local_path)
                 except Exception:
                     pass
-                    
+
             return str(compressed_path)
     except Exception as e:
         logger.warning(f"[ChatEcho] Failed to check or compress image {image_url}: {e}")
