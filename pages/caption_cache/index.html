@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>图片转述缓存管理</title>
+<style>
+:root{--bg:#f5f5f7;--text:#1d1d1f;--text2:#86868b;--text3:#aeaeb2;--card:rgba(255,255,255,0.72);--card-border:rgba(255,255,255,0.8);--card-shadow:0 8px 40px rgba(0,0,0,0.08);--accent:#0071e3;--accent2:#5856d6;--gradient1:linear-gradient(135deg,#0071e3,#5856d6);--segment-bg:rgba(0,0,0,0.06);--segment-active:#fff;--segment-shadow:0 1px 3px rgba(0,0,0,0.1);--divider:rgba(0,0,0,0.06);--tag-bg:rgba(0,113,227,0.08);--tag-text:#0071e3;--danger:#ff3b30;--danger-bg:rgba(255,59,48,0.08);--danger-hover:rgba(255,59,48,0.15);--success:#34c759;--success-bg:rgba(52,199,89,0.08);--input-bg:rgba(0,0,0,0.04);--input-border:rgba(0,0,0,0.1);--overlay:rgba(0,0,0,0.4);--modal-bg:rgba(255,255,255,0.95);--img-placeholder:rgba(0,0,0,0.04)}
+html[data-theme="dark"]{--bg:#000;--text:#f5f5f7;--text2:#86868b;--text3:#48484a;--card:rgba(28,28,30,0.78);--card-border:rgba(255,255,255,0.06);--card-shadow:0 8px 40px rgba(0,0,0,0.4);--accent:#2997ff;--accent2:#5e5ce6;--gradient1:linear-gradient(135deg,#2997ff,#5e5ce6);--segment-bg:rgba(255,255,255,0.08);--segment-active:rgba(255,255,255,0.15);--segment-shadow:0 1px 3px rgba(0,0,0,0.3);--divider:rgba(255,255,255,0.06);--tag-bg:rgba(41,151,255,0.12);--tag-text:#2997ff;--danger:#ff453a;--danger-bg:rgba(255,69,58,0.12);--danger-hover:rgba(255,69,58,0.2);--success:#30d158;--success-bg:rgba(48,209,88,0.12);--input-bg:rgba(255,255,255,0.06);--input-border:rgba(255,255,255,0.1);--overlay:rgba(0,0,0,0.6);--modal-bg:rgba(28,28,30,0.95);--img-placeholder:rgba(255,255,255,0.06)}
+*{box-sizing:border-box;margin:0;padding:0}html{-webkit-font-smoothing:antialiased}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .4s,color .4s}
+.bg-glow{position:fixed;top:-20%;left:-10%;width:60%;height:60%;background:radial-gradient(ellipse,rgba(0,113,227,0.06) 0%,transparent 70%);pointer-events:none;z-index:0}
+html[data-theme="dark"] .bg-glow{background:radial-gradient(ellipse,rgba(41,151,255,0.08) 0%,transparent 70%)}
+.container{max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+header{padding:60px 0 20px;text-align:center;opacity:0;transform:translateY(20px);animation:fadeUp .8s cubic-bezier(.22,1,.36,1) forwards}
+header .badge{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.05em;color:var(--tag-text);background:var(--tag-bg);padding:4px 14px;border-radius:20px;margin-bottom:16px;text-transform:uppercase}
+header h1{font-size:clamp(32px,5vw,56px);font-weight:700;letter-spacing:-.025em;line-height:1.1;background:var(--gradient1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+header .sub{font-size:18px;color:var(--text2)}
+
+/* Hero Stats Card */
+.hero-card{margin:24px 0 28px;padding:36px 32px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:24px;box-shadow:var(--card-shadow);display:flex;align-items:center;justify-content:center;gap:48px;flex-wrap:wrap;opacity:0;transform:translateY(30px);animation:fadeUp .8s .15s forwards}
+.stat-item{text-align:center}
+.stat-item .num{font-size:clamp(36px,6vw,56px);font-weight:700;letter-spacing:-.03em;line-height:1;background:var(--gradient1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-item .lb{font-size:14px;color:var(--text2);font-weight:500;margin-top:4px}
+
+/* Toolbar */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:24px;opacity:0;transform:translateY(20px);animation:fadeUp .8s .3s forwards}
+.toolbar-left{display:flex;gap:10px;flex-wrap:wrap;flex:1}
+.btn{padding:9px 18px;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;transition:all .25s;font-family:inherit;outline:none;display:inline-flex;align-items:center;gap:6px}
+.btn-danger{background:var(--danger-bg);color:var(--danger)}.btn-danger:hover{background:var(--danger-hover);transform:translateY(-1px)}
+.btn-accent{background:var(--tag-bg);color:var(--tag-text)}.btn-accent:hover{background:rgba(0,113,227,0.15);transform:translateY(-1px)}
+.btn-accent:disabled,.btn-danger:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}
+
+/* Time range filter */
+.time-filter{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)}
+.time-filter input[type="date"]{padding:6px 10px;border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);font-size:13px;font-family:inherit;outline:none}
+.time-filter input[type="date"]:focus{border-color:var(--accent)}
+
+/* Search box */
+.search-box{position:relative;flex:1;min-width:200px;max-width:400px}
+.search-box input{width:100%;padding:9px 36px 9px 34px;border-radius:12px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .25s,box-shadow .25s}
+.search-box input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,113,227,0.1)}
+.search-box input::placeholder{color:var(--text3)}
+.search-box .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text3);pointer-events:none}
+.search-box .search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:var(--segment-bg);color:var(--text2);width:20px;height:20px;border-radius:50%;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;padding:0}
+.search-box .search-clear.show{display:flex}
+
+/* Cache List */
+.cache-list{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.cache-item{display:flex;gap:16px;padding:16px 20px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:16px;box-shadow:var(--card-shadow);transition:all .3s;opacity:0;transform:translateX(-20px);align-items:flex-start}
+.cache-item.visible{animation:slideIn .5s forwards}
+.cache-item:hover{transform:translateX(4px)}
+.cache-item.removing{animation:slideOut .35s forwards;pointer-events:none}
+
+/* Image preview */
+.img-preview{width:72px;height:72px;border-radius:10px;flex-shrink:0;overflow:hidden;background:var(--img-placeholder);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:transform .2s}
+.img-preview:hover{transform:scale(1.05)}
+.img-preview img{width:100%;height:100%;object-fit:cover}
+.img-preview .no-img{font-size:28px;opacity:.3;user-select:none}
+.img-preview .no-img-label{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:8px;color:var(--text3);font-weight:500}
+
+/* Item content */
+.item-content{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.item-caption{font-size:14px;line-height:1.5;color:var(--text);word-break:break-all;cursor:pointer;padding:4px 8px;border-radius:8px;transition:background .2s;border:1px solid transparent}
+.item-caption:hover{background:var(--input-bg)}
+.item-caption.editing{cursor:text}
+.item-meta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text3)}
+.item-meta .hash{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:11px;background:var(--input-bg);padding:2px 6px;border-radius:4px}
+.item-actions{flex-shrink:0;display:flex;gap:6px;align-items:flex-start;padding-top:4px}
+
+/* Inline edit */
+.edit-area{display:flex;flex-direction:column;gap:6px;width:100%}
+.edit-area textarea{width:100%;min-height:60px;padding:8px 10px;border-radius:8px;border:1px solid var(--accent);background:var(--input-bg);color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.5}
+.edit-actions{display:flex;gap:6px;justify-content:flex-end}
+.btn-save{background:var(--success-bg);color:var(--success)}.btn-save:hover{background:rgba(52,199,89,0.15)}
+.btn-cancel{background:var(--segment-bg);color:var(--text2)}.btn-cancel:hover{background:var(--input-bg)}
+
+/* Load more */
+.load-more{text-align:center;padding:20px 0;opacity:0;transform:translateY(20px)}
+.load-more.visible{animation:fadeUp .5s forwards}
+
+/* Empty state */
+.empty-state{text-align:center;padding:80px 20px;color:var(--text2);font-size:16px}
+.empty-state .icon{font-size:48px;margin-bottom:16px}
+.empty-state .hint{font-size:14px;color:var(--text3);margin-top:8px}
+
+/* Confirm Modal */
+.modal-overlay{position:fixed;inset:0;background:var(--overlay);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s;pointer-events:none}
+.modal-overlay.show{opacity:1;pointer-events:auto}
+.modal{background:var(--modal-bg);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--card-border);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,0.2);padding:28px 24px;max-width:400px;width:90%;text-align:center;transform:scale(.9);transition:transform .3s cubic-bezier(.22,1,.36,1)}
+.modal-overlay.show .modal{transform:scale(1)}
+.modal h3{font-size:18px;font-weight:600;margin-bottom:8px}
+.modal p{font-size:14px;color:var(--text2);margin-bottom:20px;line-height:1.5}
+.modal-btns{display:flex;gap:10px;justify-content:center}
+.modal-btns .btn{min-width:100px;justify-content:center}
+
+/* Image lightbox */
+.lightbox{position:fixed;inset:0;background:var(--overlay);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s;pointer-events:none;cursor:zoom-out}
+.lightbox.show{opacity:1;pointer-events:auto}
+.lightbox img{max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 20px 80px rgba(0,0,0,0.4);transform:scale(.85);transition:transform .3s cubic-bezier(.22,1,.36,1)}
+.lightbox.show img{transform:scale(1)}
+
+/* Toast */
+.toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--card);backdrop-filter:blur(20px);border:1px solid var(--card-border);border-radius:12px;padding:10px 20px;font-size:13px;font-weight:500;box-shadow:0 8px 30px rgba(0,0,0,0.15);opacity:0;transition:all .35s;z-index:300;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{to{opacity:1;transform:translateX(0)}}
+@keyframes slideOut{to{opacity:0;transform:translateX(40px);height:0;padding:0;margin:0;overflow:hidden}}
+@media(max-width:680px){.container{padding:0 16px}header{padding:40px 0 16px}.hero-card{padding:24px 20px;gap:24px}.toolbar{flex-direction:column;align-items:stretch}.toolbar-left{flex-direction:column}.cache-item{flex-direction:column;gap:10px;padding:14px 16px}.img-preview{width:100%;height:160px;border-radius:12px}.item-actions{align-self:flex-end}}
+</style></head>
+<body>
+<div class="bg-glow"></div>
+<div class="container">
+<header><div class="badge">Cache Manager</div><h1>图片转述缓存</h1><div class="sub">管理图片识别结果缓存</div></header>
+<div class="hero-card">
+<div class="stat-item"><div class="num" id="statCount">—</div><div class="lb">缓存条数</div></div>
+<div class="stat-item"><div class="num" id="statSize">—</div><div class="lb">数据库大小</div></div>
+</div>
+<div class="toolbar">
+<div class="toolbar-left">
+<button class="btn btn-danger" id="btnClearAll" onclick="confirmClearAll()">🗑️ 一键清空</button>
+<div class="time-filter">
+<span>清理</span>
+<input type="date" id="dateBefore">
+<span>之前的缓存</span>
+<button class="btn btn-accent btn-sm" id="btnClearBefore" onclick="confirmClearBefore()">清理</button>
+</div>
+</div>
+<div class="search-box">
+<span class="search-icon">🔍</span>
+<input type="text" id="searchInput" placeholder="搜索转述内容…">
+<button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+</div>
+</div>
+<div class="cache-list" id="cacheList"></div>
+<div class="load-more" id="loadMore">
+<button class="btn btn-accent" id="btnLoadMore" onclick="loadMore()">加载更多</button>
+</div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal">
+<div class="modal">
+<h3 id="modalTitle">确认操作</h3>
+<p id="modalDesc">确定要执行此操作吗？</p>
+<div class="modal-btns">
+<button class="btn btn-cancel" onclick="closeModal()">取消</button>
+<button class="btn btn-danger" id="modalConfirmBtn" onclick="modalConfirm()">确认</button>
+</div>
+</div>
+</div>
+
+<!-- Image Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+<img id="lightboxImg" src="" alt="preview">
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script type="module">
+const B=window.AstrBotPluginPage;
+if(!B){document.body.innerHTML='<div class="container"><div class="empty-state"><div class="icon">⚠️</div><div>Bridge not available</div></div></div>'}else{await B.ready();
+(function(){const m=window.matchMedia('(prefers-color-scheme:dark)');function s(d){document.documentElement.setAttribute('data-theme',d?'dark':'light')}s(m.matches);m.addEventListener('change',e=>s(e.matches))})();
+
+const PAGE_SIZE=20;
+let allItems=[];
+let offset=0;
+let totalCount=0;
+let pendingAction=null;
+
+// Elements
+const statCount=document.getElementById('statCount');
+const statSize=document.getElementById('statSize');
+const cacheList=document.getElementById('cacheList');
+const loadMoreWrap=document.getElementById('loadMore');
+const btnLoadMore=document.getElementById('btnLoadMore');
+const btnClearAll=document.getElementById('btnClearAll');
+const btnClearBefore=document.getElementById('btnClearBefore');
+const dateBefore=document.getElementById('dateBefore');
+const confirmModal=document.getElementById('confirmModal');
+const modalTitle=document.getElementById('modalTitle');
+const modalDesc=document.getElementById('modalDesc');
+const modalConfirmBtn=document.getElementById('modalConfirmBtn');
+const lightbox=document.getElementById('lightbox');
+const lightboxImg=document.getElementById('lightboxImg');
+const toast=document.getElementById('toast');
+const searchInput=document.getElementById('searchInput');
+const searchClear=document.getElementById('searchClear');
+let currentSearch='';
+
+// Format file size
+function fmtSize(bytes){
+  if(bytes<1024)return bytes+' B';
+  if(bytes<1048576)return(bytes/1024).toFixed(1)+' KB';
+  return(bytes/1048576).toFixed(1)+' MB';
+}
+
+// Format date
+function fmtDate(ts){
+  if(!ts)return '—';
+  const d=new Date(ts*1000);
+  const pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Toast notification
+let toastTimer=null;
+window.showToast=function(msg,dur=2500){
+  toast.textContent=msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>toast.classList.remove('show'),dur);
+};
+
+// Modal helpers
+window.closeModal=function(){confirmModal.classList.remove('show');pendingAction=null;};
+window.modalConfirm=function(){if(pendingAction){pendingAction();pendingAction=null;}closeModal();};
+
+function showModal(title,desc,action){
+  modalTitle.textContent=title;
+  modalDesc.textContent=desc;
+  pendingAction=action;
+  confirmModal.classList.add('show');
+}
+
+// Lightbox
+window.openLightbox=function(url){
+  lightboxImg.src=url;
+  lightbox.classList.add('show');
+};
+window.closeLightbox=function(){lightbox.classList.remove('show');lightboxImg.src='';};
+
+// Load stats
+async function loadStats(){
+  try{
+    const r=await B.apiGet('caption_cache/stats');
+    const d=r&&r.data?r.data:r;
+    statCount.textContent=d.count!=null?d.count.toLocaleString():'0';
+    statSize.textContent=d.db_size!=null?fmtSize(d.db_size):'0 B';
+    totalCount=d.count||0;
+    btnClearAll.disabled=totalCount===0;
+  }catch(e){
+    statCount.textContent='—';statSize.textContent='—';
+  }
+}
+
+// Render a single item
+function renderItem(item,index){
+  const el=document.createElement('div');
+  el.className='cache-item';
+  el.dataset.hash=item.img_hash;
+  el.style.animationDelay=`${index*0.04}s`;
+
+  const hasUrl=item.image_url&&(item.image_url.startsWith('http')||item.image_url.startsWith('/'));
+  const imgHtml=hasUrl
+    ?`<div class="img-preview" onclick="openLightbox('${item.image_url.replace(/'/g,"\\'")}')"><img src="${item.image_url}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'no-img\\'>🖼️</div><div class=\\'no-img-label\\'>加载失败</div>'"></div>`
+    :`<div class="img-preview"><div class="no-img">🖼️</div><div class="no-img-label">URL 未记录</div></div>`;
+
+  const hashShort=item.img_hash.length>12?item.img_hash.slice(0,12)+'…':item.img_hash;
+
+  el.innerHTML=`
+    ${imgHtml}
+    <div class="item-content">
+      <div class="item-caption" data-hash="${item.img_hash}" onclick="startEdit(this)" title="点击编辑">${escapeHtml(item.caption||'(无转述内容)')}</div>
+      <div class="item-meta">
+        <span class="hash" title="${item.img_hash}">${hashShort}</span>
+        <span>📅 ${fmtDate(item.created_at)}</span>
+      </div>
+    </div>
+    <div class="item-actions">
+      <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.img_hash}',this)">删除</button>
+    </div>
+  `;
+  return el;
+}
+
+function escapeHtml(s){
+  const d=document.createElement('div');d.textContent=s;return d.innerHTML;
+}
+
+// Load items
+async function loadItems(append=false){
+  try{
+    const params={offset,limit:PAGE_SIZE};
+    if(currentSearch)params.search=currentSearch;
+    const r=await B.apiGet('caption_cache',params);
+    const d=r&&r.data?r.data:r;
+    const items=d.items||[];
+    totalCount=d.total||0;
+
+    if(!append)cacheList.innerHTML='';
+
+    if(totalCount===0&&!append){
+      cacheList.innerHTML='<div class="empty-state"><div class="icon">📭</div><div>暂无缓存数据</div><div class="hint">当图片转述功能触发后，缓存将自动生成</div></div>';
+      loadMoreWrap.style.display='none';
+      return;
+    }
+
+    items.forEach((item,i)=>{
+      const el=renderItem(item,i);
+      cacheList.appendChild(el);
+      requestAnimationFrame(()=>el.classList.add('visible'));
+    });
+
+    allItems=append?allItems.concat(items):items;
+    offset+=items.length;
+
+    if(offset>=totalCount){
+      loadMoreWrap.style.display='none';
+    }else{
+      loadMoreWrap.style.display='';
+      loadMoreWrap.classList.add('visible');
+    }
+  }catch(e){
+    cacheList.innerHTML='<div class="empty-state"><div class="icon">⚠️</div><div>加载失败</div><div class="hint">'+e.message+'</div></div>';
+  }
+}
+
+window.loadMore=async function(){
+  btnLoadMore.disabled=true;
+  btnLoadMore.textContent='加载中…';
+  await loadItems(true);
+  btnLoadMore.disabled=false;
+  btnLoadMore.textContent='加载更多';
+};
+
+// Delete single item
+window.deleteItem=function(hash,btnEl){
+  showModal('确认删除','确定要删除这条缓存记录吗？此操作不可撤销。',async()=>{
+    try{
+      await B.apiPost('caption_cache/delete',{img_hash:hash});
+      const el=btnEl.closest('.cache-item');
+      if(el){el.classList.add('removing');setTimeout(()=>el.remove(),400);}
+      showToast('已删除');
+      await loadStats();
+    }catch(e){showToast('删除失败: '+e.message);}
+  });
+};
+
+// Inline edit
+window.startEdit=function(captionEl){
+  if(captionEl.classList.contains('editing'))return;
+  const hash=captionEl.dataset.hash;
+  const currentText=captionEl.textContent;
+  captionEl.classList.add('editing');
+
+  const editArea=document.createElement('div');
+  editArea.className='edit-area';
+  editArea.innerHTML=`
+    <textarea>${escapeHtml(currentText==='(无转述内容)'?'':currentText)}</textarea>
+    <div class="edit-actions">
+      <button class="btn btn-cancel btn-sm" onclick="cancelEdit(this)">取消</button>
+      <button class="btn btn-save btn-sm" onclick="saveEdit(this,'${hash}')">✓ 保存</button>
+    </div>
+  `;
+  captionEl.style.display='none';
+  captionEl.parentElement.insertBefore(editArea,captionEl.nextSibling);
+  const ta=editArea.querySelector('textarea');
+  ta.focus();
+  ta.setSelectionRange(ta.value.length,ta.value.length);
+};
+
+window.cancelEdit=function(btn){
+  const editArea=btn.closest('.edit-area');
+  const captionEl=editArea.previousElementSibling;
+  captionEl.style.display='';
+  captionEl.classList.remove('editing');
+  editArea.remove();
+};
+
+window.saveEdit=async function(btn,hash){
+  const editArea=btn.closest('.edit-area');
+  const ta=editArea.querySelector('textarea');
+  const newCaption=ta.value.trim();
+  const captionEl=editArea.previousElementSibling;
+
+  btn.disabled=true;
+  btn.textContent='保存中…';
+  try{
+    await B.apiPost('caption_cache/update',{img_hash:hash,caption:newCaption});
+    captionEl.textContent=newCaption||'(无转述内容)';
+    captionEl.style.display='';
+    captionEl.classList.remove('editing');
+    editArea.remove();
+    showToast('已保存');
+  }catch(e){
+    showToast('保存失败: '+e.message);
+    btn.disabled=false;
+    btn.textContent='✓ 保存';
+  }
+};
+
+// Clear all
+window.confirmClearAll=function(){
+  showModal('清空所有缓存',`确定要清空全部 ${totalCount} 条缓存记录吗？此操作不可撤销。`,async()=>{
+    try{
+      const r=await B.apiPost('caption_cache/clear');
+      const deleted=r&&r.deleted!=null?r.deleted:0;
+      showToast(`已清空 ${deleted} 条缓存`);
+      offset=0;allItems=[];
+      await Promise.all([loadStats(),loadItems()]);
+    }catch(e){showToast('清空失败: '+e.message);}
+  });
+};
+
+// Clear before date
+window.confirmClearBefore=function(){
+  const val=dateBefore.value;
+  if(!val){showToast('请先选择日期');return;}
+  const ts=new Date(val+'T23:59:59').getTime()/1000;
+  showModal('按时间清理缓存',`确定要删除 ${val} 之前的所有缓存吗？此操作不可撤销。`,async()=>{
+    try{
+      const r=await B.apiPost('caption_cache/clear_before',{before:ts});
+      const deleted=r&&r.deleted!=null?r.deleted:0;
+      showToast(`已清理 ${deleted} 条缓存`);
+      offset=0;allItems=[];
+      await Promise.all([loadStats(),loadItems()]);
+    }catch(e){showToast('清理失败: '+e.message);}
+  });
+};
+
+// Search with debounce
+let searchTimer=null;
+searchInput.addEventListener('input',()=>{
+  const val=searchInput.value.trim();
+  searchClear.classList.toggle('show',val.length>0);
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(()=>{
+    if(val===currentSearch)return;
+    currentSearch=val;
+    offset=0;allItems=[];
+    loadItems();
+  },350);
+});
+searchInput.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){searchInput.value='';searchClear.classList.remove('show');if(currentSearch){currentSearch='';offset=0;allItems=[];loadItems();}}
+});
+window.clearSearch=function(){
+  searchInput.value='';searchClear.classList.remove('show');
+  if(currentSearch){currentSearch='';offset=0;allItems=[];loadItems();}
+  searchInput.focus();
+};
+
+// Keyboard: Escape to close modal/lightbox
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeModal();closeLightbox();}
+});
+
+// Initial load
+await Promise.all([loadStats(),loadItems()]);
+}
+</script>
+</body>
+</html>

@@ -64,6 +64,42 @@ class EchoPlugin(Star):
             ["GET"],
             "历史趋势数据（多群多线）",
         )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/caption_cache",
+            self.api_caption_cache_list,
+            ["GET"],
+            "图片转述缓存列表",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/caption_cache/stats",
+            self.api_caption_cache_stats,
+            ["GET"],
+            "图片转述缓存统计",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/caption_cache/delete",
+            self.api_caption_cache_delete,
+            ["POST"],
+            "删除单条转述缓存",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/caption_cache/clear",
+            self.api_caption_cache_clear,
+            ["POST"],
+            "清空全部转述缓存",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/caption_cache/clear_before",
+            self.api_caption_cache_clear_before,
+            ["POST"],
+            "按时间清理转述缓存",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/caption_cache/update",
+            self.api_caption_cache_update,
+            ["POST"],
+            "更新转述内容",
+        )
 
     async def initialize(self):
         self.logger.info(
@@ -248,14 +284,14 @@ class EchoPlugin(Star):
         # 1. Check message components
         for comp in event.get_messages():
             if isinstance(comp, At):
-                at_target = str(getattr(comp, 'qq', getattr(comp, 'target', '')))
+                at_target = str(getattr(comp, "qq", getattr(comp, "target", "")))
                 if at_target == str(self_id):
                     is_at_bot = True
                 elif (
                     persona_name
                     and persona_name != "default"
-                    and getattr(comp, 'name', '')
-                    and persona_name.lower() in getattr(comp, 'name', '').lower()
+                    and getattr(comp, "name", "")
+                    and persona_name.lower() in getattr(comp, "name", "").lower()
                 ):
                     is_at_bot = True
                 elif at_target and at_target != "all":
@@ -508,7 +544,9 @@ class EchoPlugin(Star):
         is_temp_file = False
         try:
             import os
+
             from .helpers import compress_image_if_needed
+
             compressed_url = await compress_image_if_needed(image_url)
             if image_url.startswith("http://") or image_url.startswith("https://"):
                 is_temp_file = True
@@ -521,7 +559,7 @@ class EchoPlugin(Star):
             resp = await prov.text_chat(prompt=prompt, image_urls=[compressed_url])
             if resp and resp.completion_text:
                 caption = resp.completion_text.strip()
-                self.caption_cache.set(img_hash, caption)
+                self.caption_cache.set(img_hash, caption, image_url=image_url)
                 return caption
         except Exception as e:
             self.logger.exception(f"Failed to get image caption: {e}")
@@ -533,6 +571,131 @@ class EchoPlugin(Star):
                     pass
 
         return ""
+
+    async def api_caption_cache_list(self):
+        """GET handler: paginated caption cache list with optional search."""
+        try:
+            from quart import jsonify
+            from quart import request as qreq
+
+            offset = int(qreq.args.get("offset", 0)) if qreq else 0
+            limit = int(qreq.args.get("limit", 20)) if qreq else 20
+            search = qreq.args.get("search", "").strip() if qreq else ""
+            limit = min(limit, 100)
+            items = self.caption_cache.get_all(offset, limit, search=search)
+            total = self.caption_cache.get_count(search=search)
+            return jsonify(
+                {
+                    "status": "ok",
+                    "data": {
+                        "items": items,
+                        "total": total,
+                        "offset": offset,
+                        "limit": limit,
+                        "search": search,
+                    },
+                }
+            )
+        except Exception as e:
+            from quart import jsonify
+
+            self.logger.exception(f"Failed to list caption cache: {e}")
+            return jsonify({"status": "error", "message": str(e)})
+
+    async def api_caption_cache_stats(self):
+        """GET handler: caption cache statistics."""
+        try:
+            from quart import jsonify
+
+            count = self.caption_cache.get_count()
+            db_size = self.caption_cache.get_db_size()
+            return jsonify(
+                {"status": "ok", "data": {"count": count, "db_size": db_size}}
+            )
+        except Exception as e:
+            from quart import jsonify
+
+            self.logger.exception(f"Failed to get caption cache stats: {e}")
+            return jsonify({"status": "error", "message": str(e)})
+
+    async def api_caption_cache_delete(self):
+        """POST handler: delete a single cache entry."""
+        try:
+            from quart import jsonify
+            from quart import request as qreq
+
+            body = await qreq.get_json()
+            img_hash = body.get("img_hash", "") if body else ""
+            if not img_hash:
+                return jsonify({"status": "error", "message": "img_hash is required"})
+            ok = self.caption_cache.delete(img_hash)
+            return jsonify({"status": "ok", "deleted": ok})
+        except Exception as e:
+            from quart import jsonify
+
+            self.logger.exception(f"Failed to delete caption cache entry: {e}")
+            return jsonify({"status": "error", "message": str(e)})
+
+    async def api_caption_cache_clear(self):
+        """POST handler: clear all cache entries."""
+        try:
+            from quart import jsonify
+
+            deleted = self.caption_cache.clear()
+            self.logger.info(
+                f"[CaptionCache] Cleared all entries, deleted {deleted} items."
+            )
+            return jsonify({"status": "ok", "deleted": deleted})
+        except Exception as e:
+            from quart import jsonify
+
+            self.logger.exception(f"Failed to clear caption cache: {e}")
+            return jsonify({"status": "error", "message": str(e)})
+
+    async def api_caption_cache_clear_before(self):
+        """POST handler: clear cache entries before a given timestamp."""
+        try:
+            from quart import jsonify
+            from quart import request as qreq
+
+            body = await qreq.get_json()
+            before = float(body.get("before", 0)) if body else 0
+            if before <= 0:
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "valid 'before' timestamp is required",
+                    }
+                )
+            deleted = self.caption_cache.delete_before(before)
+            self.logger.info(
+                f"[CaptionCache] Cleared entries before {before}, deleted {deleted} items."
+            )
+            return jsonify({"status": "ok", "deleted": deleted})
+        except Exception as e:
+            from quart import jsonify
+
+            self.logger.exception(f"Failed to clear old caption cache: {e}")
+            return jsonify({"status": "error", "message": str(e)})
+
+    async def api_caption_cache_update(self):
+        """POST handler: update caption text for a cache entry."""
+        try:
+            from quart import jsonify
+            from quart import request as qreq
+
+            body = await qreq.get_json()
+            img_hash = body.get("img_hash", "") if body else ""
+            caption = body.get("caption", "") if body else ""
+            if not img_hash:
+                return jsonify({"status": "error", "message": "img_hash is required"})
+            ok = self.caption_cache.update_caption(img_hash, caption)
+            return jsonify({"status": "ok", "updated": ok})
+        except Exception as e:
+            from quart import jsonify
+
+            self.logger.exception(f"Failed to update caption cache: {e}")
+            return jsonify({"status": "error", "message": str(e)})
 
     async def terminate(self):
         self.logger.info("主动接话插件卸载中...")
