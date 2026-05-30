@@ -9,6 +9,39 @@
       "any_message"
     ]
   },
+  "enabled_groups": {
+    "type": "template_list",
+    "description": "群白名单（支持按群自定义概率）",
+    "hint": "只在这些群中启用。留空则所有群生效。支持直接填群ID或完整UMO（如 Bot:GroupMessage:12345）。",
+    "default": [],
+    "templates": {
+      "group_template": {
+        "name": "群组配置",
+        "items": {
+          "group_id": {
+            "type": "string",
+            "description": "群ID / UMO",
+            "hint": "群号或完整UMO（如 Bot:GroupMessage:12345），多个用逗号分隔（支持中文逗号）",
+            "default": ""
+          },
+          "reply_probability": {
+            "type": "int",
+            "description": "回复概率(%)",
+            "hint": "留空使用全局回复概率",
+            "default": null,
+            "slider": { "min": 0, "max": 100, "step": 5 }
+          },
+          "active_probability": {
+            "type": "int",
+            "description": "主动概率(%)",
+            "hint": "留空使用全局主动概率",
+            "default": null,
+            "slider": { "min": 0, "max": 100, "step": 5 }
+          }
+        }
+      }
+    }
+  },
   "analyzer_provider_id": {
     "type": "string",
     "description": "分析用 LLM Provider（建议选便宜的模型）",
@@ -22,30 +55,6 @@
     "_special": "select_provider",
     "default": "",
     "hint": "用于生成主动回复内容的LLM（建议用质量高的模型如GPT-5.5）。留空则使用该会话的默认Provider"
-  },
-  "enable_image_caption": {
-    "type": "bool",
-    "description": "启用图片转述（非多模态模型建议开启）",
-    "hint": "若使用的不是多模态模型，开启此项可对群聊消息中的图片使用图片转述模型进行描述转述，供模型阅读。",
-    "default": false
-  },
-  "image_caption_probability": {
-    "type": "int",
-    "description": "图片转述概率（%）",
-    "hint": "仅用于平时即时转述以匹配图片中的关键词。当缓存未命中时，按此概率决定是否调用大模型对新图片进行转述。已缓存的图片会100%直接使用。注意：在Bot准备回复构建上下文时，为了保证回复质量，会对未转述的图片进行100%强制转述。100=每张都转述，0=不转述新图片",
-    "default": 100,
-    "slider": {
-      "min": 0,
-      "max": 100,
-      "step": 5
-    }
-  },
-  "image_caption_provider_id": {
-    "type": "string",
-    "description": "图片转述 LLM Provider",
-    "_special": "select_provider",
-    "default": "",
-    "hint": "用于图片转述的LLM（如多模态模型如GPT-4o/Gemini/Claude等）。留空则使用会话默认或全局图片转述Provider"
   },
   "track_timeout_seconds": {
     "type": "int",
@@ -80,6 +89,20 @@
       "step": 5
     }
   },
+  "enable_llm_tools": {
+    "type": "bool",
+    "description": "回复模式是否启用 LLM 工具/技能",
+    "hint": "开启后回复模式使用 AstrBot 工具循环，LLM 可调用已注册的工具/技能（如搜索、图片生成等）。关闭则仅使用纯文本 LLM 生成，不调用任何工具",
+    "default": true
+  },
+  "analyzer_system_prompt": {
+    "type": "text",
+    "description": "【回复分析】LLM 系统提示词",
+    "hint": "用于判断群友消息是否在回复Bot的LLM提示词。输出应为JSON格式：{\"is_reply_to_bot\": \"yes|no\", \"reason\": \"...\"}",
+    "default": "你是一个群聊对话分析师。请分析以下群聊上下文，判断群友的最新消息是否在和你对话。\n\n判断标准：\n1. 你上一条/上几条消息是你发的，群友紧接着你发言 → 默认是在对话\n2. 消息中提到你的名字或@了你 → 肯定是在对话\n3. 群友在跟别人说话（叫了别人名字、回应非你的消息，或者@了别人、回复了别人）→ 不是在对话\n4. 群友只是发纯语气词/表情且无任何上下文关联 → 不是在对话\n\n注意：如果消息中明确@了其他人，或者回复引用了其他人的消息（而非你），这属于在跟别人说话，判断结果应为不是在对话（\"no\"）。\n\n核心逻辑：你刚说完话就有人接话，正常聊天中就是对方在回应你。但如果对方明确是在和别人互动，则排除。\n宁可误判也不要漏判。\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"is_reply_to_bot\": \"yes|no\",\n  \"reason\": \"简短的原因说明\"\n}",
+    "editor_mode": true,
+    "editor_language": "markdown"
+  },
   "active_probability": {
     "type": "int",
     "description": "主动模式 - 参与命中概率（%）",
@@ -91,49 +114,40 @@
       "step": 5
     }
   },
-  "enabled_groups": {
-    "type": "template_list",
-    "description": "群白名单（支持按群自定义概率）",
-    "hint": "只在这些群中启用。留空则所有群生效。支持直接填群ID或完整UMO（如 Bot:GroupMessage:12345）。",
-    "default": [],
-    "templates": {
-      "group_template": {
-        "name": "群组配置",
-        "items": {
-          "group_id": {
-            "type": "string",
-            "description": "群ID / UMO",
-            "hint": "群号或完整UMO（如 Bot:GroupMessage:12345），多个用逗号分隔（支持中文逗号）",
-            "default": ""
-          },
-          "reply_probability": {
-            "type": "int",
-            "description": "回复概率(%)",
-            "hint": "留空使用全局回复概率",
-            "default": null,
-            "slider": { "min": 0, "max": 100, "step": 5 }
-          },
-          "active_probability": {
-            "type": "int",
-            "description": "主动概率(%)",
-            "hint": "留空使用全局主动概率",
-            "default": null,
-            "slider": { "min": 0, "max": 100, "step": 5 }
-          }
-        }
-      }
+  "max_proactive_rounds": {
+    "type": "int",
+    "description": "主动模式 - 最大参与轮数",
+    "hint": "Bot随机主动参与群聊的最大次数，达到后不再在本次启动周期中主动插话。仅影响主动模式（Route 2），不影响@bot对话。0=不限制",
+    "default": 3,
+    "slider": {
+      "min": 0,
+      "max": 10,
+      "step": 1
     }
+  },
+  "proactive_cooldown_seconds": {
+    "type": "int",
+    "description": "主动模式 - 冷却时间（秒）",
+    "hint": "主动模式下，每次Bot主动发言后，等待多久才能再次在该群触发新的主动参与。建议配合 max_proactive_rounds 使用",
+    "default": 300,
+    "slider": {
+      "min": 30,
+      "max": 3600,
+      "step": 30
+    }
+  },
+  "proactive_analyzer_system_prompt": {
+    "type": "text",
+    "description": "【主动分析】LLM 系统提示词",
+    "hint": "用于判断Bot是否应该主动参与讨论的LLM提示词。输出应为JSON格式：{\"should_join\": \"yes|no\", \"reason\": \"...\"}",
+    "default": "你是一个群聊观察者。请分析以下群聊内容，判断你是否应该参与讨论。\n\n判断标准：\n1. 群消息中提到的话题你是否了解或有见解\n2. 对话是否在邀请更多人参与（提问、征求意见等）\n3. 你是否有想说的内容（吐槽、补充、提问、分享等）\n4. 只要是你有内容想回复，就回复\"yes\"\n5. 只有你完全无话可说时才回复\"no\"\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"should_join\": \"yes|no\",\n  \"reason\": \"简短的原因说明\"\n}",
+    "editor_mode": true,
+    "editor_language": "markdown"
   },
   "enable_keyword_trigger": {
     "type": "bool",
     "description": "启用关键词监听模式",
     "hint": "开启后，当群聊消息中提到设置的兴趣关键词时，将按概率触发回复",
-    "default": false
-  },
-  "enable_keyword_on_image": {
-    "type": "bool",
-    "description": "关键词匹配图片内容",
-    "hint": "开启后，会对图片进行转述，并将转述文本用于匹配关键词。关闭则只对文本消息进行关键词匹配（更省 Token）",
     "default": false
   },
   "keyword_rules": {
@@ -179,99 +193,35 @@
       "step": 5
     }
   },
-  "max_proactive_rounds": {
-    "type": "int",
-    "description": "主动模式 - 最大参与轮数",
-    "hint": "Bot随机主动参与群聊的最大次数，达到后不再在本次启动周期中主动插话。仅影响主动模式（Route 2），不影响@bot对话。0=不限制",
-    "default": 3,
-    "slider": {
-      "min": 0,
-      "max": 10,
-      "step": 1
-    }
-  },
-  "proactive_cooldown_seconds": {
-    "type": "int",
-    "description": "主动模式 - 冷却时间（秒）",
-    "hint": "主动模式下，每次Bot主动发言后，等待多久才能再次在该群触发新的主动参与。建议配合 max_proactive_rounds 使用",
-    "default": 300,
-    "slider": {
-      "min": 30,
-      "max": 3600,
-      "step": 30
-    }
-  },
-  "enable_llm_tools": {
+  "enable_keyword_on_image": {
     "type": "bool",
-    "description": "回复模式是否启用 LLM 工具/技能",
-    "hint": "开启后回复模式使用 AstrBot 工具循环，LLM 可调用已注册的工具/技能（如搜索、图片生成等）。关闭则仅使用纯文本 LLM 生成，不调用任何工具",
-    "default": true
-  },
-  "analyzer_system_prompt": {
-    "type": "text",
-    "description": "【回复分析】LLM 系统提示词",
-    "hint": "用于判断群友消息是否在回复Bot的LLM提示词。输出应为JSON格式：{\"is_reply_to_bot\": \"yes|no\", \"reason\": \"...\"}",
-    "default": "你是一个群聊对话分析师。请分析以下群聊上下文，判断群友的最新消息是否在和你对话。\n\n判断标准：\n1. 你上一条/上几条消息是你发的，群友紧接着你发言 → 默认是在对话\n2. 消息中提到你的名字或@了你 → 肯定是在对话\n3. 群友在跟别人说话（叫了别人名字、回应非你的消息，或者@了别人、回复了别人）→ 不是在对话\n4. 群友只是发纯语气词/表情且无任何上下文关联 → 不是在对话\n\n注意：如果消息中明确@了其他人，或者回复引用了其他人的消息（而非你），这属于在跟别人说话，判断结果应为不是在对话（\"no\"）。\n\n核心逻辑：你刚说完话就有人接话，正常聊天中就是对方在回应你。但如果对方明确是在和别人互动，则排除。\n宁可误判也不要漏判。\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"is_reply_to_bot\": \"yes|no\",\n  \"reason\": \"简短的原因说明\"\n}",
-    "editor_mode": true,
-    "editor_language": "markdown"
-  },
-  "proactive_analyzer_system_prompt": {
-    "type": "text",
-    "description": "【主动分析】LLM 系统提示词",
-    "hint": "用于判断Bot是否应该主动参与讨论的LLM提示词。输出应为JSON格式：{\"should_join\": \"yes|no\", \"reason\": \"...\"}",
-    "default": "你是一个群聊观察者。请分析以下群聊内容，判断你是否应该参与讨论。\n\n判断标准：\n1. 群消息中提到的话题你是否了解或有见解\n2. 对话是否在邀请更多人参与（提问、征求意见等）\n3. 你是否有想说的内容（吐槽、补充、提问、分享等）\n4. 只要是你有内容想回复，就回复\"yes\"\n5. 只有你完全无话可说时才回复\"no\"\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"should_join\": \"yes|no\",\n  \"reason\": \"简短的原因说明\"\n}",
-    "editor_mode": true,
-    "editor_language": "markdown"
-  },
-  "human_like_mode": {
-    "type": "bool",
-    "description": "伪人模式 - 让 Bot 表现得更像真人",
-    "hint": "开启后 Bot 会根据人格自主决定状态（如睡觉/忙碌/空闲），影响群聊参与度，并加入随机打字延迟。需要配合 analyzer_provider 使用（用于判断状态）。",
+    "description": "关键词匹配图片内容",
+    "hint": "开启后，会对图片进行转述，并将转述文本用于匹配关键词。关闭则只对文本消息进行关键词匹配（更省 Token）",
     "default": false
   },
-  "wake_at_threshold": {
-    "type": "int",
-    "description": "伪人模式 - 唤醒所需@次数",
-    "hint": "Bot 睡觉时被 @ 多少次后强制唤醒并回复",
-    "default": 3,
-    "slider": {
-      "min": 1,
-      "max": 10,
-      "step": 1
-    }
+  "enable_image_caption": {
+    "type": "bool",
+    "description": "启用图片转述（非多模态模型建议开启）",
+    "hint": "若使用的不是多模态模型，开启此项可对群聊消息中的图片使用图片转述模型进行描述转述，供模型阅读。",
+    "default": false
   },
-  "wake_window_minutes": {
+  "image_caption_probability": {
     "type": "int",
-    "description": "伪人模式 - @唤醒有效窗口（分钟）",
-    "hint": "@ 累计计数的有效时间窗口，超过此时间的 @ 记录将不再计入",
-    "default": 30,
+    "description": "图片转述概率（%）",
+    "hint": "仅用于平时即时转述以匹配图片中的关键词。当缓存未命中时，按此概率决定是否调用大模型对新图片进行转述。已缓存的图片会100%直接使用。注意：在Bot准备回复构建上下文时，为了保证回复质量，会对未转述的图片进行100%强制转述。100=每张都转述，0=不转述新图片",
+    "default": 100,
     "slider": {
-      "min": 5,
-      "max": 120,
+      "min": 0,
+      "max": 100,
       "step": 5
     }
   },
-  "typing_delay_min": {
-    "type": "float",
-    "description": "伪人模式 - 打字延迟最小（秒）",
-    "hint": "Bot 发言前的随机延迟下限，模拟人类打字速度",
-    "default": 1.5,
-    "slider": {
-      "min": 0,
-      "max": 10,
-      "step": 0.5
-    }
-  },
-  "typing_delay_max": {
-    "type": "float",
-    "description": "伪人模式 - 打字延迟最大（秒）",
-    "hint": "Bot 发言前的随机延迟上限，模拟人类打字速度",
-    "default": 4.0,
-    "slider": {
-      "min": 0,
-      "max": 10,
-      "step": 0.5
-    }
+  "image_caption_provider_id": {
+    "type": "string",
+    "description": "图片转述 LLM Provider",
+    "_special": "select_provider",
+    "default": "",
+    "hint": "用于图片转述的LLM（如多模态模型如GPT-4o/Gemini/Claude等）。留空则使用会话默认或全局图片转述Provider"
   },
   "batch_analysis_enabled": {
     "type": "bool",
@@ -361,5 +311,55 @@
       "skip_use_url",
       "skip_use_placeholder"
     ]
+  },
+  "human_like_mode": {
+    "type": "bool",
+    "description": "伪人模式 - 让 Bot 表现得更像真人",
+    "hint": "开启后 Bot 会根据人格自主决定状态（如睡觉/忙碌/空闲），影响群聊参与度，并加入随机打字延迟。需要配合 analyzer_provider 使用（用于判断状态）。",
+    "default": false
+  },
+  "wake_at_threshold": {
+    "type": "int",
+    "description": "伪人模式 - 唤醒所需@次数",
+    "hint": "Bot 睡觉时被 @ 多少次后强制唤醒并回复",
+    "default": 3,
+    "slider": {
+      "min": 1,
+      "max": 10,
+      "step": 1
+    }
+  },
+  "wake_window_minutes": {
+    "type": "int",
+    "description": "伪人模式 - @唤醒有效窗口（分钟）",
+    "hint": "@ 累计计数的有效时间窗口，超过此时间的 @ 记录将不再计入",
+    "default": 30,
+    "slider": {
+      "min": 5,
+      "max": 120,
+      "step": 5
+    }
+  },
+  "typing_delay_min": {
+    "type": "float",
+    "description": "伪人模式 - 打字延迟最小（秒）",
+    "hint": "Bot 发言前的随机延迟下限，模拟人类打字速度",
+    "default": 1.5,
+    "slider": {
+      "min": 0,
+      "max": 10,
+      "step": 0.5
+    }
+  },
+  "typing_delay_max": {
+    "type": "float",
+    "description": "伪人模式 - 打字延迟最大（秒）",
+    "hint": "Bot 发言前的随机延迟上限，模拟人类打字速度",
+    "default": 4.0,
+    "slider": {
+      "min": 0,
+      "max": 10,
+      "step": 0.5
+    }
   }
 }
