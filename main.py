@@ -446,9 +446,11 @@ class EchoPlugin(Star):
             self._activity_scale = 1.0
 
         # ====== Keyword Trigger (Route 3) ======
+        tracker = self.tracker_manager.get_tracker(group_id)
         if (
             self.config_helper.enable_keyword_trigger()
             and self.config_helper.parsed_keywords
+            and not (tracker and tracker.alive)  # 有活跃reply tracker时跳过关键词，让reply路由处理
         ):
             matched_keyword, matched_prob = self.config_helper.get_matched_keyword(
                 group_id, msg_content
