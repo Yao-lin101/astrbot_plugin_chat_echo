@@ -96,28 +96,31 @@
     "description": "群白名单（支持按群自定义概率）",
     "hint": "只在这些群中启用。留空则所有群生效。支持直接填群ID或完整UMO（如 Bot:GroupMessage:12345）。",
     "default": [],
-    "items": {
-      "group_id": {
-        "type": "string",
-        "description": "群ID / UMO",
-        "hint": "群号或完整UMO标识（如 Bot:GroupMessage:12345）",
-        "default": ""
-      },
-      "reply_probability": {
-        "type": "int",
-        "description": "回复概率(%)",
-        "hint": "留空使用全局回复概率",
-        "default": null,
-        "optional": true,
-        "slider": { "min": 0, "max": 100, "step": 5 }
-      },
-      "active_probability": {
-        "type": "int",
-        "description": "主动概率(%)",
-        "hint": "留空使用全局主动概率",
-        "default": null,
-        "optional": true,
-        "slider": { "min": 0, "max": 100, "step": 5 }
+    "templates": {
+      "group_template": {
+        "name": "群组配置",
+        "items": {
+          "group_id": {
+            "type": "string",
+            "description": "群ID / UMO",
+            "hint": "群号或完整UMO标识（如 Bot:GroupMessage:12345）",
+            "default": ""
+          },
+          "reply_probability": {
+            "type": "int",
+            "description": "回复概率(%)",
+            "hint": "留空使用全局回复概率",
+            "default": null,
+            "slider": { "min": 0, "max": 100, "step": 5 }
+          },
+          "active_probability": {
+            "type": "int",
+            "description": "主动概率(%)",
+            "hint": "留空使用全局主动概率",
+            "default": null,
+            "slider": { "min": 0, "max": 100, "step": 5 }
+          }
+        }
       }
     }
   },
@@ -138,20 +141,24 @@
     "description": "兴趣关键词列表",
     "hint": "当群聊消息中提到这些关键词时触发回复。可为每个关键词设置独立概率。",
     "default": [],
-    "items": {
-      "keyword": {
-        "type": "string",
-        "description": "关键词",
-        "hint": "要匹配的兴趣关键词",
-        "default": ""
-      },
-      "probability": {
-        "type": "int",
-        "description": "触发概率(%)",
-        "hint": "留空使用下方默认概率",
-        "default": null,
-        "optional": true,
-        "slider": { "min": 0, "max": 100, "step": 5 }
+    "templates": {
+      "keyword_template": {
+        "name": "关键词规则",
+        "items": {
+          "keyword": {
+            "type": "string",
+            "description": "关键词",
+            "hint": "要匹配的兴趣关键词",
+            "default": ""
+          },
+          "probability": {
+            "type": "int",
+            "description": "触发概率(%)",
+            "hint": "留空使用下方默认概率",
+            "default": null,
+            "slider": { "min": 0, "max": 100, "step": 5 }
+          }
+        }
       }
     }
   },
