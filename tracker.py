@@ -54,6 +54,12 @@ class TrackerManager:
         self.active_cooldowns: dict[str, float] = {}
         self.proactive_rounds: dict[str, int] = {}
         self.cooldowns: dict[str, float] = {}
+        # Human-like mode state
+        self._current_state: dict[str, dict] = {}
+        self._schedule: dict[str, list[dict]] = {}
+        self._schedule_timer: dict[str, object] = {}
+        self._wake_hits: dict[str, list[float]] = {}
+        self._last_schedule_check: dict[str, float] = {}
 
     def get_tracker(self, group_id: str) -> ConversationTracker | None:
         return self.trackers.get(group_id)
@@ -140,3 +146,59 @@ class TrackerManager:
         self.active_cooldowns.clear()
         self.proactive_rounds.clear()
         self.cooldowns.clear()
+        self._current_state.clear()
+        self._schedule.clear()
+        for t in self._schedule_timer.values():
+            try:
+                t.cancel()
+            except Exception:
+                pass
+        self._schedule_timer.clear()
+        self._wake_hits.clear()
+        self._last_schedule_check.clear()
+
+    # ======== Human-like mode helpers ========
+
+    def get_state(self, group_id: str) -> dict:
+        """Get current state for a group. Default: free/1.0."""
+        return self._current_state.get(group_id, {"name": "空闲", "activity": 1.0, "reason": ""})
+
+    def set_state(self, group_id: str, state: dict) -> None:
+        self._current_state[group_id] = state
+
+    def get_schedule(self, group_id: str) -> list[dict]:
+        return self._schedule.get(group_id, [])
+
+    def set_schedule(self, group_id: str, schedule: list[dict]) -> None:
+        self._schedule[group_id] = schedule
+
+    def cancel_schedule_timer(self, group_id: str) -> None:
+        t = self._schedule_timer.pop(group_id, None)
+        if t:
+            try:
+                t.cancel()
+            except Exception:
+                pass
+
+    def set_schedule_timer(self, group_id: str, task) -> None:
+        self._schedule_timer[group_id] = task
+
+    def get_last_schedule_check(self, group_id: str) -> float:
+        return self._last_schedule_check.get(group_id, 0.0)
+
+    def set_last_schedule_check(self, group_id: str, ts: float) -> None:
+        self._last_schedule_check[group_id] = ts
+
+    def add_wake_hit(self, group_id: str, now: float, window_minutes: int) -> int:
+        """Add an @ hit, clean old ones, return current count."""
+        hits = self._wake_hits.setdefault(group_id, [])
+        cutoff = now - window_minutes * 60
+        hits[:] = [h for h in hits if h > cutoff]
+        hits.append(now)
+        return len(hits)
+
+    def clear_wake_hits(self, group_id: str) -> None:
+        self._wake_hits.pop(group_id, None)
+
+    def clear_all_wake(self) -> None:
+        self._wake_hits.clear()

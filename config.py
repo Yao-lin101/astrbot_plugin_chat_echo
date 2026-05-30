@@ -261,3 +261,18 @@ class ConfigHelper:
         if ap is not None:
             return ap
         return self.active_probability()
+
+    def human_like_mode(self) -> bool:
+        return bool(self.cfg("human_like_mode", False))
+
+    def wake_at_threshold(self) -> int:
+        return int(self.cfg("wake_at_threshold", 3))
+
+    def wake_window_minutes(self) -> int:
+        return int(self.cfg("wake_window_minutes", 30))
+
+    def typing_delay_min(self) -> float:
+        return float(self.cfg("typing_delay_min", 1.5))
+
+    def typing_delay_max(self) -> float:
+        return float(self.cfg("typing_delay_max", 4.0))

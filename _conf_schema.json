@@ -169,5 +169,55 @@
     "default": "你是一个群聊观察者。请分析以下群聊内容，判断你是否应该参与讨论。\n\n判断标准：\n1. 群消息中提到的话题你是否了解或有见解\n2. 对话是否在邀请更多人参与（提问、征求意见等）\n3. 你是否有想说的内容（吐槽、补充、提问、分享等）\n4. 只要是你有内容想回复，就回复\"yes\"\n5. 只有你完全无话可说时才回复\"no\"\n\n请用以下JSON格式回复（不要包含其他内容）：\n{\n  \"should_join\": \"yes|no\",\n  \"reason\": \"简短的原因说明\"\n}",
     "editor_mode": true,
     "editor_language": "markdown"
+  },
+  "human_like_mode": {
+    "type": "bool",
+    "description": "伪人模式 - 让 Bot 表现得更像真人",
+    "hint": "开启后 Bot 会根据人格自主决定状态（如睡觉/忙碌/空闲），影响群聊参与度，并加入随机打字延迟。需要配合 analyzer_provider 使用（用于判断状态）。",
+    "default": false
+  },
+  "wake_at_threshold": {
+    "type": "int",
+    "description": "伪人模式 - 唤醒所需@次数",
+    "hint": "Bot 睡觉时被 @ 多少次后强制唤醒并回复",
+    "default": 3,
+    "slider": {
+      "min": 1,
+      "max": 10,
+      "step": 1
+    }
+  },
+  "wake_window_minutes": {
+    "type": "int",
+    "description": "伪人模式 - @唤醒有效窗口（分钟）",
+    "hint": "@ 累计计数的有效时间窗口，超过此时间的 @ 记录将不再计入",
+    "default": 30,
+    "slider": {
+      "min": 5,
+      "max": 120,
+      "step": 5
+    }
+  },
+  "typing_delay_min": {
+    "type": "float",
+    "description": "伪人模式 - 打字延迟最小（秒）",
+    "hint": "Bot 发言前的随机延迟下限，模拟人类打字速度",
+    "default": 1.5,
+    "slider": {
+      "min": 0,
+      "max": 10,
+      "step": 0.5
+    }
+  },
+  "typing_delay_max": {
+    "type": "float",
+    "description": "伪人模式 - 打字延迟最大（秒）",
+    "hint": "Bot 发言前的随机延迟上限，模拟人类打字速度",
+    "default": 4.0,
+    "slider": {
+      "min": 0,
+      "max": 10,
+      "step": 0.5
+    }
   }
 }

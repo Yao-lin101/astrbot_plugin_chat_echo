@@ -4,7 +4,11 @@ AstrBot 主动接话插件 (astrbot_plugin_chat_echo)
 Refactored for improved maintainability.
 """
 
+import asyncio
+import json
+import random
 import time
+from datetime import datetime
 from pathlib import Path
 
 from astrbot.api import logger
@@ -32,7 +36,7 @@ PLUGIN_NAME = "astrbot_plugin_chat_echo"
 PROACTIVE_WINDOW_SIZE = 10
 
 
-@register("astrbot_plugin_chat_echo", "AMYdd00, Yao-lin101", "主动接话插件", "1.1.1")
+@register("astrbot_plugin_chat_echo", "AMYdd00, Yao-lin101", "主动接话插件", "1.1.2")
 class EchoPlugin(Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
@@ -351,6 +355,41 @@ class EchoPlugin(Star):
 
         if is_bot:
             return
+
+        # ====== Human-like Mode: schedule + state check ======
+        if self.config_helper.human_like_mode():
+            await self._ensure_schedule(group_id, umo, personality)
+            state = self.tracker_manager.get_state(group_id)
+            activity = state.get("activity", 1.0)
+            if activity == 0:
+                if is_at_bot:
+                    hits = self.tracker_manager.add_wake_hit(
+                        group_id, now, self.config_helper.wake_window_minutes()
+                    )
+                    self.logger.info(
+                        f"[HumanMode] {group_id} is sleeping, @ hit {hits}/{self.config_helper.wake_at_threshold()}"
+                    )
+                    if hits >= self.config_helper.wake_at_threshold():
+                        self.logger.info(
+                            f"[HumanMode] {group_id} woken up by repeated @s"
+                        )
+                        self.tracker_manager.set_state(
+                            group_id,
+                            {"name": "空闲", "activity": 1.0, "reason": "被@吵醒了", "manual": True},
+                        )
+                        self.tracker_manager.clear_wake_hits(group_id)
+                    else:
+                        return
+                else:
+                    return
+            elif activity < 1.0:
+                scale = activity
+            else:
+                scale = 1.0
+            # Apply activity scaling to route probabilities
+            self._activity_scale = scale
+        else:
+            self._activity_scale = 1.0
 
         # ====== Keyword Trigger (Route 3) ======
         if (
@@ -696,6 +735,190 @@ class EchoPlugin(Star):
 
             self.logger.exception(f"Failed to update caption cache: {e}")
             return jsonify({"status": "error", "message": str(e)})
+
+    # ======== Human-like Mode ========
+
+    async def _ensure_schedule(self, group_id: str, umo: str, personality) -> None:
+        """Ensure a schedule exists for this group, refresh when exhausted."""
+        schedule = self.tracker_manager.get_schedule(group_id)
+        if schedule:
+            last_until = schedule[-1].get("until", "23:59")
+            first_until = schedule[0].get("until", "00:00")
+            now_dt = datetime.now()
+            current_minutes = now_dt.hour * 60 + now_dt.minute
+            try:
+                h1, m1 = map(int, first_until.split(":"))
+                h2, m2 = map(int, last_until.split(":"))
+                last_minutes = h2 * 60 + m2
+                if last_minutes < h1 * 60 + m1:
+                    last_minutes += 24 * 60
+                if current_minutes < last_minutes:
+                    return
+            except (ValueError, AttributeError):
+                pass
+            self.tracker_manager.cancel_schedule_timer(group_id)
+        try:
+            persona_name_str = ""
+            if personality and personality.get("name"):
+                persona_name_str = personality["name"].strip()
+            now_dt = datetime.now()
+            weekdays = ["一", "二", "三", "四", "五", "六", "日"]
+            weekday = weekdays[now_dt.weekday()]
+            prompt = (
+                f"你Bot的人格是：{persona_name_str}\n\n"
+                f"当前时间：{now_dt.strftime('%Y-%m-%d %H:%M')}，星期{weekday}\n\n"
+                "根据你的人设，请规划接下来一段时间的行为状态。\n"
+                "每个时段定义：状态名、活跃度(0.0-1.0)、结束时间、简短理由。\n"
+                "活跃度含义：1.0=完全在线积极参与、0.5=偶尔看看、0.0=不可用(如睡觉)\n\n"
+                '输出JSON数组：[{"state": "状态名", "activity": 0.0-1.0, "until": "HH:MM", "reason": "简短理由"}]\n'
+                "只输出JSON，不要其他内容。"
+            )
+            provider_id = self.config_helper.analyzer_provider()
+            if not provider_id and umo:
+                try:
+                    provider_id = await self.context.get_current_chat_provider_id(umo)
+                except Exception:
+                    pass
+            if not provider_id:
+                return
+            resp = await self.context.llm_generate(
+                prompt=prompt,
+                chat_provider_id=provider_id,
+            )
+            text = extract_bot_text(resp) if resp else None
+            if not text:
+                return
+            # Parse JSON
+            try:
+                schedule = json.loads(text.strip())
+            except json.JSONDecodeError:
+                import re
+                m = re.search(r"\[.*\]", text, re.DOTALL)
+                if m:
+                    try:
+                        schedule = json.loads(m.group())
+                    except json.JSONDecodeError:
+                        return
+                else:
+                    return
+            if not isinstance(schedule, list) or len(schedule) == 0:
+                return
+            self.tracker_manager.set_schedule(group_id, schedule)
+            self.tracker_manager.cancel_schedule_timer(group_id)
+            self._apply_schedule(group_id, schedule, now_dt)
+            self.logger.info(
+                f"[HumanMode] {group_id} schedule refreshed: {len(schedule)} items"
+            )
+        except Exception as e:
+            self.logger.exception(f"[HumanMode] Failed to generate schedule: {e}")
+
+    def _apply_schedule(self, group_id: str, schedule: list, now_dt: datetime) -> None:
+        """Set current state from schedule and start timer for next transition."""
+        now_ts = time.time()
+        today = now_dt.date()
+        current_match = None
+        next_item = None
+        current_minutes = now_dt.hour * 60 + now_dt.minute
+        for item in schedule:
+            try:
+                until = item.get("until", "23:59")
+                h, m = map(int, until.split(":"))
+                item_minutes = h * 60 + m
+                if item_minutes > current_minutes:
+                    if next_item is None:
+                        next_item = item
+                    if current_match is None:
+                        current_match = item
+                elif current_match is None:
+                    current_match = item
+            except (ValueError, AttributeError):
+                continue
+        if current_match is None and schedule:
+            current_match = schedule[-1]
+        current_state = self.tracker_manager.get_state(group_id)
+        if current_state.get("manual"):
+            self.tracker_manager.set_state(group_id, {**current_state, "manual": False})
+        elif current_match:
+            self.tracker_manager.set_state(group_id, {
+                "name": current_match.get("state", "空闲"),
+                "activity": float(current_match.get("activity", 1.0)),
+                "reason": current_match.get("reason", ""),
+            })
+            self.logger.info(
+                f"[HumanMode] {group_id} state: {current_match.get('state')} (activity={current_match.get('activity')})"
+            )
+        # Schedule next transition
+        if next_item:
+            try:
+                h, m = map(int, next_item["until"].split(":"))
+                target = datetime(today.year, today.month, today.day, h, m)
+                if target <= now_dt:
+                    from datetime import timedelta
+                    target += timedelta(days=1)
+                delay = (target - datetime.now()).total_seconds()
+                if delay > 0:
+                    async def _transition():
+                        await asyncio.sleep(delay)
+                        dt = datetime.now()
+                        self._apply_schedule(group_id, schedule, dt)
+                    task = asyncio.create_task(_transition())
+                    self.tracker_manager.set_schedule_timer(group_id, task)
+            except (ValueError, AttributeError):
+                pass
+
+    @filter.command("bot在干嘛")
+    async def cmd_bot_status(self, event: AstrMessageEvent):
+        """Query bot's current human-like mode status."""
+        if not is_group_event(event):
+            return
+        group_id = str(event.get_group_id())
+        umo = event.unified_msg_origin
+        if not self.config_helper.is_group_allowed(group_id, umo):
+            return
+        if not self.config_helper.human_like_mode():
+            return
+        state = self.tracker_manager.get_state(group_id)
+        name = state.get("name", "空闲")
+        reason = state.get("reason", "")
+        activity = state.get("activity", 1.0)
+        if reason:
+            msg = f"{name}（活跃度: {activity}）— {reason}"
+        else:
+            msg = f"{name}（活跃度: {activity}）"
+        result = event.make_result()
+        result.message(msg)
+        yield result
+
+    @filter.command("bot计划表")
+    async def cmd_bot_schedule(self, event: AstrMessageEvent):
+        """Query bot's current full schedule."""
+        if not is_group_event(event):
+            return
+        group_id = str(event.get_group_id())
+        umo = event.unified_msg_origin
+        if not self.config_helper.is_group_allowed(group_id, umo):
+            return
+        if not self.config_helper.human_like_mode():
+            return
+        schedule = self.tracker_manager.get_schedule(group_id)
+        if not schedule:
+            result = event.make_result()
+            result.message("暂无计划表")
+            yield result
+            return
+        lines = ["Bot 当前计划表："]
+        for item in schedule:
+            state = item.get("state", "?")
+            activity = item.get("activity", 0)
+            until = item.get("until", "?")
+            reason = item.get("reason", "")
+            if reason:
+                lines.append(f"{state} (活跃度 {activity}) 至 {until} — {reason}")
+            else:
+                lines.append(f"{state} (活跃度 {activity}) 至 {until}")
+        result = event.make_result()
+        result.message("\n".join(lines))
+        yield result
 
     async def terminate(self):
         self.logger.info("主动接话插件卸载中...")

@@ -1,3 +1,5 @@
+import asyncio
+import random
 import time
 
 from astrbot.api.event import AstrMessageEvent
@@ -6,6 +8,15 @@ from .helpers import extract_image_urls
 from .tracker import ConversationTracker
 
 MAX_CONTEXT_MESSAGES = 20
+
+
+async def _maybe_typing_delay(plugin) -> None:
+    """Apply random typing delay if human_like_mode is enabled."""
+    if plugin.config_helper.human_like_mode():
+        d_min = plugin.config_helper.typing_delay_min()
+        d_max = plugin.config_helper.typing_delay_max()
+        if d_max > 0:
+            await asyncio.sleep(random.uniform(d_min, d_max))
 
 
 def build_analyze_context(tracker: ConversationTracker) -> tuple[str, list[str]]:
@@ -160,6 +171,7 @@ async def handle_reply(
         )
         # Reset detection count for next time
         tracker.detection_count = 0
+        await _maybe_typing_delay(plugin)
         return True
 
     except Exception as e:
@@ -248,6 +260,7 @@ async def handle_proactive(
             plugin.logger.info(
                 f"[Proactive] Group {group_id} reached max rounds limit."
             )
+        await _maybe_typing_delay(plugin)
         return True
 
     except Exception as e:
@@ -272,6 +285,7 @@ async def handle_keyword(
         plugin.logger.info(
             f"[Keyword] Keyword '{matched_keyword}' matched in group {group_id}. Triggering native reply..."
         )
+        await _maybe_typing_delay(plugin)
         return True
     except Exception as e:
         plugin.logger.exception(f"[Keyword] Error in handle_keyword: {e}")
