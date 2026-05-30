@@ -38,6 +38,13 @@ CONFIG_VERSION = 5
 CONFIG_VERSION_FILE = "_config_version.txt"
 
 
+def _is_valid_entry(entry) -> bool:
+    """Check if a config list entry is valid (non-empty dict or non-empty string)."""
+    if isinstance(entry, dict):
+        return True
+    return bool(str(entry).strip())
+
+
 def upgrade_config(config, data_dir: Path, logger) -> None:
     """Upgrade configuration prompts if they are outdated."""
     try:
@@ -67,9 +74,25 @@ def upgrade_config(config, data_dir: Path, logger) -> None:
         logger.exception(f"Failed to upgrade config: {e}")
 
 
-def parse_group_entry(entry: str) -> tuple[str, int | None, int | None]:
-    """Parse a group whitelist entry."""
-    entry = entry.strip()
+def parse_group_entry(entry) -> tuple[str, int | None, int | None]:
+    """Parse a group whitelist entry. Supports both old string format and new dict format."""
+    # New template_list dict format
+    if isinstance(entry, dict):
+        gid = entry.get("group_id", "").strip()
+        rp = entry.get("reply_probability")
+        ap = entry.get("active_probability")
+        if isinstance(rp, int) and rp >= 0:
+            pass
+        else:
+            rp = None
+        if isinstance(ap, int) and ap >= 0:
+            pass
+        else:
+            ap = None
+        return gid, rp, ap
+
+    # Old string format: "group_id:reply_prob:active_prob" or "Bot:GroupMessage:group_id:reply:active"
+    entry = str(entry).strip()
     if not entry:
         return "", None, None
     parts = entry.split(":")
@@ -116,9 +139,18 @@ def parse_group_entry(entry: str) -> tuple[str, int | None, int | None]:
         return group_id, reply_p, active_p
 
 
-def parse_keyword_rule(entry: str) -> tuple[str, int | None]:
-    """Parse a keyword rule entry."""
-    entry = entry.strip()
+def parse_keyword_rule(entry) -> tuple[str, int | None]:
+    """Parse a keyword rule entry. Supports both old string format and new dict format."""
+    # New template_list dict format
+    if isinstance(entry, dict):
+        kw = entry.get("keyword", "").strip()
+        prob = entry.get("probability")
+        if isinstance(prob, int) and prob >= 0:
+            return kw, prob
+        return kw, None
+
+    # Old string format: "keyword" or "keyword:probability"
+    entry = str(entry).strip()
     if not entry:
         return "", None
     if ":" in entry:
@@ -145,12 +177,12 @@ class ConfigHelper:
         """Re-parse the enabled groups from configuration."""
         enabled = self.enabled_groups()
         self.parsed_groups = [
-            parse_group_entry(entry) for entry in enabled if entry.strip()
+            parse_group_entry(entry) for entry in enabled if _is_valid_entry(entry)
         ]
 
         keywords = self.keyword_rules()
         self.parsed_keywords = [
-            parse_keyword_rule(entry) for entry in keywords if entry.strip()
+            parse_keyword_rule(entry) for entry in keywords if _is_valid_entry(entry)
         ]
 
     def cfg(self, key: str, default=None):

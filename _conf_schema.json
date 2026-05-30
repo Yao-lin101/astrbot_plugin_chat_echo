@@ -92,10 +92,34 @@
     }
   },
   "enabled_groups": {
-    "type": "list",
+    "type": "template_list",
     "description": "群白名单（支持按群自定义概率）",
-    "hint": "只在这些群中启用。格式：`群ID:【回复概率】:【主动概率】`，可留空某个值，如`群ID::30`表示只设主动概率30%。也支持UMO：`Bot:GroupMessage:群ID`。例：`-100123456:80:30`。留空则所有群生效",
-    "default": []
+    "hint": "只在这些群中启用。留空则所有群生效。支持直接填群ID或完整UMO（如 Bot:GroupMessage:12345）。",
+    "default": [],
+    "items": {
+      "group_id": {
+        "type": "string",
+        "description": "群ID / UMO",
+        "hint": "群号或完整UMO标识（如 Bot:GroupMessage:12345）",
+        "default": ""
+      },
+      "reply_probability": {
+        "type": "int",
+        "description": "回复概率(%)",
+        "hint": "留空使用全局回复概率",
+        "default": null,
+        "optional": true,
+        "slider": { "min": 0, "max": 100, "step": 5 }
+      },
+      "active_probability": {
+        "type": "int",
+        "description": "主动概率(%)",
+        "hint": "留空使用全局主动概率",
+        "default": null,
+        "optional": true,
+        "slider": { "min": 0, "max": 100, "step": 5 }
+      }
+    }
   },
   "enable_keyword_trigger": {
     "type": "bool",
@@ -110,10 +134,26 @@
     "default": false
   },
   "keyword_rules": {
-    "type": "list",
+    "type": "template_list",
     "description": "兴趣关键词列表",
-    "hint": "格式：`关键词` 或 `关键词:概率`，例如：`苹果`、`香蕉:50`。不设置概率的关键词将使用默认概率。",
-    "default": []
+    "hint": "当群聊消息中提到这些关键词时触发回复。可为每个关键词设置独立概率。",
+    "default": [],
+    "items": {
+      "keyword": {
+        "type": "string",
+        "description": "关键词",
+        "hint": "要匹配的兴趣关键词",
+        "default": ""
+      },
+      "probability": {
+        "type": "int",
+        "description": "触发概率(%)",
+        "hint": "留空使用下方默认概率",
+        "default": null,
+        "optional": true,
+        "slider": { "min": 0, "max": 100, "step": 5 }
+      }
+    }
   },
   "keyword_default_probability": {
     "type": "int",
