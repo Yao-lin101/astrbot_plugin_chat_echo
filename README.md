@@ -43,40 +43,79 @@
 
 ## 配置说明
 
+### 基础设置
+
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `trigger_mode` | string | `llm_response` | 触发模式：`llm_response`（仅 LLM 回复后监听）/ `any_message`（任何消息后监听） |
-| `analyzer_provider_id` | string | 空 | 分析用 LLM Provider（建议便宜的模型如本地部署/DeepSeek）。留空使用会话默认 |
-| `generator_provider_id` | string | 空 | 生成用 LLM Provider（建议高质量模型如 GPT-5.5）。留空使用会话默认 |
-| `track_timeout_seconds` | int | `120` | 跟踪窗口(秒)。群聊沉默超时即停止，范围 10~600 |
-| `max_detection_count` | int | `10` | 最多分析多少条群友发言后停止本轮，范围 1~50 |
-| `reply_probability` | int | `100` | 回复模式分析概率(%)。100=每条都分析，50=一半概率 |
-| `active_probability` | int | `0` | 主动模式参与概率(%)。0=关闭，100=每条都可能触发 |
-| `max_proactive_rounds` | int | `3` | 最大连续主动回复轮数，1=只接话一次，范围 1~10 |
-| `proactive_cooldown_seconds` | int | `300` | 主动发言冷却(秒)，范围 30~3600 |
-| `enabled_groups` | list | `[]` | 群白名单（见下方说明）。留空则所有群生效 |
-| `analyzer_system_prompt` | text | 默认提示词 | 回复分析 LLM 提示词，用于判断群友消息是否在回复 Bot |
-| `proactive_analyzer_system_prompt` | text | 默认提示词 | 主动分析 LLM 提示词，用于判断 Bot 是否应主动参与讨论。版本更新后会覆盖提示词，如需保留自定义提示词请自行备份 |
-| `generator_system_prompt` | text | 默认提示词 | 回复生成 LLM 提示词，控制 Bot 回复风格和语气 |
+| `enabled_groups` | template_list | `[]` | 群白名单。WebUI 模板化编辑，支持多群号（逗号分隔）、UMO 格式。留空则所有群生效 |
 
-### 群白名单 (`enabled_groups`)
+### LLM Provider
 
-**格式：`群ID:回复概率:主动概率`**
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `analyzer_provider_id` | string | 空 | 分析用 LLM Provider（建议便宜的模型如本地部署/DeepSeek） |
+| `generator_provider_id` | string | 空 | 生成用 LLM Provider（建议高质量模型如 GPT-5.5） |
 
-> - `回复概率` — Bot发言后，群友消息按此概率发给LLM分析是否回复Bot
-> - `主动概率` — 随机抽取群消息按此概率发给LLM分析是否主动参与
-> - 留空某个值如 `群ID::30` 表示只设主动概率
-> - UMO格式同样支持：`Bot:GroupMessage:群ID`
+### 回复模式 (Route 1)
 
-示例：
-```json
-["-100123456:80:30", "Bot:GroupMessage:-100789012:50"]
-```
-- `"-100123456:80:30"` — 群号`-100123456`，回复概率80%，主动概率30%
-- `"-100789012:50"` — 群号`-100789012`，回复概率50%，主动概率用全局值
-- `"-100123456::30"` — 群号`-100123456`，回复概率用全局值，主动概率30%
-- `"Bot:GroupMessage:-100789012:50"` — UMO格式（Bot:GroupMessage:群ID），回复概率50%
-- `"-100789012"` — 仅白名单，两个概率都用全局值
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `track_timeout_seconds` | int | `120` | 跟踪窗口(秒)，群聊沉默超时即停止，10~600 |
+| `max_detection_count` | int | `10` | 最多分析条数后停止本轮，1~50 |
+| `reply_probability` | int | `100` | 分析概率(%)，0~100 |
+| `enable_llm_tools` | bool | `true` | 是否启用 LLM 工具/技能 |
+| `analyzer_system_prompt` | text | 默认 | 回复分析 LLM 提示词 |
+
+### 主动模式 (Route 2)
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `active_probability` | int | `0` | 参与概率(%)，0=关闭，0~100 |
+| `max_proactive_rounds` | int | `3` | 最大连续主动回复轮数，0~10 |
+| `proactive_cooldown_seconds` | int | `300` | 主动发言冷却(秒)，30~3600 |
+| `proactive_analyzer_system_prompt` | text | 默认 | 主动分析 LLM 提示词 |
+
+### 关键词模式 (Route 3)
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `enable_keyword_trigger` | bool | `false` | 启用关键词监听 |
+| `keyword_rules` | template_list | `[]` | 关键词规则列表，支持多关键词（逗号分隔）和按群设置 |
+| `keyword_default_probability` | int | `100` | 关键词默认触发概率(%)，0~100 |
+| `enable_keyword_on_image` | bool | `false` | 关键词是否匹配图片内容 |
+
+### 图片转述
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `enable_image_caption` | bool | `false` | 启用图片转述（非多模态模型建议开启） |
+| `image_caption_probability` | int | `100` | 平时图片转述概率(%)，0~100 |
+| `image_caption_provider_id` | string | 空 | 图片转述 LLM Provider |
+
+### 批次分析
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `batch_analysis_enabled` | bool | `true` | 启用延迟批次分析 |
+| `silence_multiplier` | float | `2.5` | 静默判定倍数，1.5~5.0 |
+| `min_silence_seconds` | int | `3` | 最小静默秒数，2~10 |
+| `max_silence_seconds` | int | `12` | 最大静默秒数，5~30 |
+| `max_batch_wait_seconds` | int | `15` | 绝对超时秒数，5~60 |
+| `max_batch_messages` | int | `6` | 最大消息数，2~20 |
+| `instant_at_bot` | bool | `true` | @Bot 时立即触发分析 |
+| `caption_timeout_seconds` | int | `10` | 图片转述等待超时(秒) |
+| `caption_timeout_behavior` | string | `wait_then_fallback` | 图片转述超时策略：等待降级 / 直接传URL / 占位符 |
+
+### 伪人模式
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `human_like_mode` | bool | `false` | 启用伪人模式 |
+| `wake_at_threshold` | int | `3` | 唤醒所需@次数 |
+| `wake_window_minutes` | int | `30` | @唤醒有效窗口(分钟) |
+| `typing_delay_min` | float | `1.5` | 打字延迟最小(秒) |
+| `typing_delay_max` | float | `4.0` | 打字延迟最大(秒) |
 
 ## 安装
 
