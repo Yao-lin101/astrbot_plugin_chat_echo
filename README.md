@@ -2,7 +2,7 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 [![License](https://img.shields.io/badge/License-AGPLv3-green)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.2-blueviolet)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.3-blueviolet)](CHANGELOG.md)
 
 ## 简介
 
@@ -34,6 +34,9 @@
 - ✅ **延迟转述** — 平时发图 0 API 消耗，仅在 Bot 回复构建上下文时对未转述图片强制转述
 - ✅ **Token 用量统计** — 内置 WebUI 面板，按群/按天展示 Token 消耗趋势及多群对比
 - ✅ **伪人模式** — Bot 根据人格自主决定状态（如睡觉/忙碌/空闲），影响群聊参与度，支持随机打字延迟
+- ✅ **延迟批次分析** — 自适应群聊节奏，等停顿后批量分析，避免抢话
+- ✅ **多关键词 & 按群设置** — 一条规则覆盖多个关键词，精确控制生效群范围
+- ✅ **多群组配置** — 一套概率规则应用到多个群，支持 UMO 格式
 - ✅ **`/bot在干嘛`** — 群内随时查询 Bot 当前状态
 - ✅ **`/bot计划表`** — 群内查询 Bot 完整日程安排
 - ✅ **多平台兼容** — 支持 aiocqhttp / telegram / discord / lark / qq_official / dingtalk / kook / slack / mattermost / satori
