@@ -314,6 +314,9 @@ class EchoPlugin(Star):
         if not self.config_helper.is_group_allowed(group_id, umo):
             return
 
+        if event.get_result() is not None:
+            return  # 已被命令处理器处理，跳过
+
         now = time.time()
 
         is_bot = False
