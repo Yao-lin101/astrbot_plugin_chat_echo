@@ -316,8 +316,11 @@ class EchoPlugin(Star):
         if not self.config_helper.is_group_allowed(group_id, umo):
             return
 
-        if event.is_at_or_wake_command:
-            return  # 已被命令处理器处理，跳过
+        cmd_text = (event.message_str or "").strip()
+        if cmd_text:
+            for prefix in self.config_helper.filter_prefixes():
+                if cmd_text.startswith(prefix):
+                    return  # 指令消息，跳过全部处理
 
         now = time.time()
 
@@ -437,6 +440,7 @@ class EchoPlugin(Star):
                             {"name": "空闲", "activity": 1.0, "reason": "被@吵醒了", "manual": True},
                         )
                         self.tracker_manager.clear_wake_hits(group_id)
+                        scale = 1.0  # 唤醒后活跃度恢复
                     else:
                         return
                 else:
