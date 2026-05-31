@@ -295,12 +295,7 @@ class ConfigHelper:
         return False
 
     def is_group_allowed(self, group_id: str, umo: str) -> bool:
-        if not self.parsed_groups:
-            return True
-        for gid, _, _ in self.parsed_groups:
-            if self.is_match_group(gid, group_id, umo):
-                return True
-        return False
+        return True  # 白名单仅控制概率覆盖，不做硬拦截
 
     def get_group_probability(
         self, group_id: str, umo: str

@@ -11,8 +11,8 @@
   },
   "enabled_groups": {
     "type": "template_list",
-    "description": "群白名单（支持按群自定义概率）",
-    "hint": "只在这些群中启用。留空则所有群生效。支持直接填群ID或完整UMO（如 Bot:GroupMessage:12345）。",
+    "description": "群白名单（按群覆盖概率）",
+    "hint": "为指定群设置独立概率，未设置的群使用全局默认概率。支持直接填群ID或完整UMO（如 Bot:GroupMessage:12345）。留空则所有群使用全局概率。",
     "default": [],
     "templates": {
       "group_template": {
