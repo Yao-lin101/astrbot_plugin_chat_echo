@@ -953,6 +953,13 @@ if (!B) {
     });
   }
 
+  function parseResponse(res) {
+    if (res && res.status === 'ok' && res.data !== undefined) {
+      return res.data;
+    }
+    return res;
+  }
+
   // Load backend configurations
   window.loadData = async function() {
     try {
@@ -966,10 +973,10 @@ if (!B) {
         B.apiGet('providers')
       ]);
 
-      personas = personasRes.data || personasRes || [];
-      personaPrompts = promptsRes.data || promptsRes || [];
-      config = configRes.data || {};
-      providers = providersRes.data || [];
+      personas = parseResponse(personasRes) || [];
+      personaPrompts = parseResponse(promptsRes) || [];
+      config = parseResponse(configRes) || {};
+      providers = parseResponse(providersRes) || [];
 
       // Render Personas Dropdown
       personaSelect.innerHTML = '';
