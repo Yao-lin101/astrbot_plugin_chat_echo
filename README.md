@@ -2,7 +2,7 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 [![License](https://img.shields.io/badge/License-AGPLv3-green)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.3-blueviolet)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-blueviolet)](CHANGELOG.md)
 
 ## 简介
 
@@ -66,6 +66,7 @@
 | `reply_probability` | int | `100` | 分析概率(%)，0~100 |
 | `enable_llm_tools` | bool | `true` | 是否启用 LLM 工具/技能 |
 | `analyzer_system_prompt` | text | 默认 | 回复分析 LLM 提示词 |
+| `persona_replies` | template_list | `[]` | 专属回复分析人设提示词列表。可为不同的人格设置简化的专属回复分析人设 |
 
 ### 主动模式 (Route 2)
 

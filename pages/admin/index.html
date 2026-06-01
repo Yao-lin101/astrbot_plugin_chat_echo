@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>主动接话插件配置</title>
+<style>
+:root {
+  --bg: #f5f5f7;
+  --text: #1d1d1f;
+  --text2: #86868b;
+  --text3: #aeaeb2;
+  --card: rgba(255,255,255,0.72);
+  --card-border: rgba(255,255,255,0.8);
+  --card-shadow: 0 8px 40px rgba(0,0,0,0.06);
+  --accent: #0071e3;
+  --accent-light: rgba(0,113,227,0.08);
+  --gradient1: linear-gradient(135deg,#0071e3,#5856d6);
+  --divider: rgba(0,0,0,0.06);
+  --input-bg: rgba(0,0,0,0.04);
+  --input-border: rgba(0,0,0,0.1);
+  --success: #34c759;
+  --success-bg: rgba(52,199,89,0.08);
+  --success-hover: rgba(52,199,89,0.15);
+  --info: #0071e3;
+  --info-bg: rgba(0,113,227,0.08);
+  --danger: #ff3b30;
+  --danger-bg: rgba(255,59,48,0.08);
+  --danger-hover: rgba(255,59,48,0.15);
+}
+html[data-theme="dark"] {
+  --bg: #000;
+  --text: #f5f5f7;
+  --text2: #86868b;
+  --text3: #48484a;
+  --card: rgba(28,28,30,0.78);
+  --card-border: rgba(255,255,255,0.06);
+  --card-shadow: 0 8px 40px rgba(0,0,0,0.4);
+  --accent: #2997ff;
+  --accent-light: rgba(41,151,255,0.12);
+  --gradient1: linear-gradient(135deg,#2997ff,#5e5ce6);
+  --divider: rgba(255,255,255,0.06);
+  --input-bg: rgba(255,255,255,0.06);
+  --input-border: rgba(255,255,255,0.1);
+  --success: #30d158;
+  --success-bg: rgba(48,209,88,0.12);
+  --success-hover: rgba(48,209,88,0.2);
+  --info: #2997ff;
+  --info-bg: rgba(41,151,255,0.12);
+  --danger: #ff453a;
+  --danger-bg: rgba(255,69,58,0.12);
+  --danger-hover: rgba(255,69,58,0.2);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; }
+body {
+  font-family: -apple-system,BlinkMacSystemFont,"SF Pro Display","Microsoft YaHei",sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background .4s, color .4s;
+  padding-bottom: 60px;
+}
+.bg-glow {
+  position: fixed;
+  top: -20%;
+  left: -10%;
+  width: 60%;
+  height: 60%;
+  background: radial-gradient(ellipse,rgba(0,113,227,0.04) 0%,transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+html[data-theme="dark"] .bg-glow {
+  background: radial-gradient(ellipse,rgba(41,151,255,0.05) 0%,transparent 70%);
+}
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+header {
+  padding: 40px 0 20px;
+  text-align: center;
+}
+header h1 {
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 700;
+  letter-spacing: -.025em;
+  background: var(--gradient1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+header .sub {
+  font-size: 14px;
+  color: var(--text2);
+}
+
+/* Tabs */
+.tabs-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: var(--input-bg);
+  padding: 6px;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  border: 1px solid var(--input-border);
+}
+.tab-btn {
+  flex: 1;
+  min-width: 110px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all .2s;
+  outline: none;
+  text-align: center;
+  white-space: nowrap;
+}
+.tab-btn:hover {
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+}
+.tab-btn.active {
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 4px 12px rgba(0,113,227,0.2);
+}
+html[data-theme="dark"] .tab-btn.active {
+  color: #000;
+  background: var(--text);
+  box-shadow: 0 4px 12px rgba(255,255,255,0.1);
+}
+
+/* Tab Panels */
+.tab-panel {
+  display: none;
+  animation: fadeIn .3s cubic-bezier(.22,1,.36,1) forwards;
+}
+.tab-panel.active {
+  display: block;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Config Card */
+.config-card {
+  padding: 28px;
+  background: var(--card);
+  backdrop-filter: blur(32px) saturate(140%);
+  -webkit-backdrop-filter: blur(32px) saturate(140%);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 24px;
+}
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  border-left: 4px solid var(--accent);
+  padding-left: 10px;
+  line-height: 1.2;
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 22px;
+}
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.form-group.checkbox-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0,0,0,0.02);
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--divider);
+}
+html[data-theme="dark"] .form-group.checkbox-row {
+  background: rgba(255,255,255,0.02);
+}
+.form-group.checkbox-row label {
+  margin-bottom: 0;
+  padding-right: 12px;
+  cursor: pointer;
+}
+
+/* Inputs */
+.text-input, .select-input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: all .25s;
+}
+.text-input:focus, .select-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+select.select-input {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  padding-right: 36px;
+}
+textarea.textarea-input {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  outline: none;
+  transition: all .25s;
+  resize: vertical;
+}
+textarea.textarea-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* Range Slider */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.slider-input {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--input-border);
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+}
+.slider-input::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: transform .1s;
+}
+.slider-input::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+}
+.slider-value {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: right;
+  color: var(--accent);
+}
+
+/* Custom Switch Toggle */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--text3);
+  transition: .25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 24px;
+}
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+}
+input:checked + .switch-slider {
+  background-color: var(--success);
+}
+input:checked + .switch-slider:before {
+  transform: translateX(20px);
+}
+
+/* Hints */
+.hint-text {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* List Manager styling */
+.list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+.list-item-card {
+  background: rgba(0,0,0,0.015);
+  border: 1px dashed var(--input-border);
+  padding: 16px;
+  border-radius: 12px;
+  position: relative;
+  animation: fadeIn .2s ease forwards;
+}
+html[data-theme="dark"] .list-item-card {
+  background: rgba(255,255,255,0.01);
+}
+.list-item-card .remove-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: var(--danger-bg);
+  color: var(--danger);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  font-weight: bold;
+}
+.list-item-card .remove-btn:hover {
+  background: var(--danger-hover);
+  transform: scale(1.05);
+}
+.list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  padding-right: 32px;
+}
+.add-btn {
+  margin-top: 8px;
+  padding: 10px 16px;
+  border: 1px dashed var(--accent);
+  background: transparent;
+  color: var(--accent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all .2s;
+}
+.add-btn:hover {
+  background: var(--accent-light);
+}
+
+/* Buttons Row */
+.footer-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--divider);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  z-index: 100;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
+}
+.btn {
+  padding: 11px 24px;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 100px;
+}
+.btn-secondary {
+  background: var(--input-bg);
+  color: var(--text);
+}
+.btn-secondary:hover {
+  background: var(--divider);
+}
+.btn-primary {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.btn-primary:hover {
+  background: var(--success-hover);
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+  opacity: 0;
+  transition: all .3s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 300;
+  pointer-events: none;
+  text-align: center;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+</style>
+</head>
+<body>
+<div class="bg-glow"></div>
+<div class="container">
+  <header>
+    <h1>主动接话与定制设置</h1>
+    <div class="sub">集中管理主动回复、关键字检测、图片转述、伪人选项和角色人设简化等配置</div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('persona')">👤 人设定制</button>
+    <button class="tab-btn" onclick="switchTab('general')">⚙️ 基础与触发</button>
+    <button class="tab-btn" onclick="switchTab('reply')">💬 回复与主动</button>
+    <button class="tab-btn" onclick="switchTab('keyword')">🔑 关键词与图片</button>
+    <button class="tab-btn" onclick="switchTab('batch')">⏱️ 延迟与批次</button>
+    <button class="tab-btn" onclick="switchTab('human')">🤖 伪人设置</button>
+  </nav>
+
+  <!-- Tab 1: Persona Settings -->
+  <div class="tab-panel active" id="tab-persona">
+    <div class="config-card">
+      <h2 class="section-title">回复分析人设定制</h2>
+      <div class="form-group">
+        <label for="personaSelect">选择人格角色</label>
+        <select class="select-input" id="personaSelect" onchange="onPersonaChange()">
+          <option value="">正在加载人格列表...</option>
+        </select>
+        <div class="hint-text">为特定人格设置简化的专属回复分析提示词，可降低 Context 占用。</div>
+      </div>
+      <div class="form-group">
+        <label for="personaPrompt">专属回复分析人设提示词</label>
+        <textarea class="textarea-input" id="personaPrompt" placeholder="例如：天童爱丽丝，一个可爱的AI机器人，喜欢打游戏，说话带‘!级’。"></textarea>
+        <div class="hint-text">填写一到两句话的简化版描述。留空则默认降级为该人格的完整系统提示词。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 2: General & Whitelist -->
+  <div class="tab-panel" id="tab-general">
+    <div class="config-card">
+      <h2 class="section-title">基础设置</h2>
+      <div class="form-group">
+        <label for="trigger_mode">触发跟踪模式</label>
+        <select class="select-input" id="trigger_mode">
+          <option value="llm_response">llm_response (仅在LLM回复后开始监听)</option>
+          <option value="any_message">any_message (Bot发出任何消息后都开始监听)</option>
+        </select>
+        <div class="hint-text">选择合适的时候开启检测窗口。</div>
+      </div>
+      <div class="form-group">
+        <label for="filter_prefixes">指令过滤前缀</label>
+        <input type="text" class="text-input" id="filter_prefixes" placeholder="如：/, !, #, $">
+        <div class="hint-text">以这些前缀开头的消息将被静默过滤，不进行任何回复分析。多个前缀用逗号隔开。</div>
+      </div>
+    </div>
+
+    <div class="config-card">
+      <h2 class="section-title">白名单与概率覆盖配置</h2>
+      <div class="hint-text" style="margin-bottom:12px;">为指定群设置独立的主动或回复接话概率，支持直接填群ID或UMO（如 Bot:GroupMessage:12345）。不在此列表的群组将使用全局默认值。</div>
+      <div class="list-container" id="groups-list"></div>
+      <button class="add-btn" onclick="addGroupItem()">＋ 添加群组覆盖规则</button>
+    </div>
+  </div>
+
+  <!-- Tab 3: Reply & Proactive Settings -->
+  <div class="tab-panel" id="tab-reply">
+    <div class="config-card">
+      <h2 class="section-title">回复模式选项</h2>
+      <div class="form-group">
+        <label for="reply_probability">回复模式 - 分析概率 (%)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="reply_probability" min="0" max="100" step="5" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-reply_probability">0%</span>
+        </div>
+        <div class="hint-text">Bot发言后，监听窗口内群友的每条消息有多少概率被分析是否是在跟Bot对话。100代表每条都分析。</div>
+      </div>
+      <div class="form-group">
+        <label for="track_timeout_seconds">跟踪窗口超时时间 (秒)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="track_timeout_seconds" min="10" max="600" step="10" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-track_timeout_seconds">0s</span>
+        </div>
+        <div class="hint-text">如果群内一直没有人说话，超过多少秒后自动关闭本次监听窗口。</div>
+      </div>
+      <div class="form-group">
+        <label for="max_detection_count">最大分析消息数 (条)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="max_detection_count" min="1" max="50" step="1" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-max_detection_count">0</span>
+        </div>
+        <div class="hint-text">本次监听窗口中，最多对多少条消息进行对话关系分析。</div>
+      </div>
+      <div class="form-group checkbox-row">
+        <label for="enable_llm_tools">启用 LLM 技能 / 工具循环</label>
+        <label class="switch">
+          <input type="checkbox" id="enable_llm_tools">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="analyzer_provider_id">分析用 LLM 供应商 (建议使用廉价模型)</label>
+        <select class="select-input" id="analyzer_provider_id"></select>
+        <div class="hint-text">专门用来做对话相关性分析判断的模型提供商，建议配置性价比高的模型，留空则使用默认。</div>
+      </div>
+      <div class="form-group">
+        <label for="generator_provider_id">回复用 LLM 供应商 (建议使用高质量模型)</label>
+        <select class="select-input" id="generator_provider_id"></select>
+        <div class="hint-text">对话分析通过后，实际用来生成接话内容的模型提供商，留空则使用默认。</div>
+      </div>
+      <div class="form-group">
+        <label for="analyzer_system_prompt">【回复分析】LLM 判断系统提示词</label>
+        <textarea class="textarea-input" id="analyzer_system_prompt"></textarea>
+        <div class="hint-text">必须返回标准的 JSON 格式：{"is_reply_to_bot": "yes|no", "reason": "..."}</div>
+      </div>
+    </div>
+
+    <div class="config-card">
+      <h2 class="section-title">主动模式选项</h2>
+      <div class="form-group">
+        <label for="active_probability">主动模式 - 参与概率 (%)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="active_probability" min="0" max="100" step="5" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-active_probability">0%</span>
+        </div>
+        <div class="hint-text">Bot未被唤醒也未发言时，随机收到群友消息时，按此概率决定是否分析话题并主动插话。0表示彻底关闭主动模式。</div>
+      </div>
+      <div class="form-group">
+        <label for="max_proactive_rounds">最大主动参与轮数</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="max_proactive_rounds" min="0" max="10" step="1" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-max_proactive_rounds">0</span>
+        </div>
+        <div class="hint-text">本轮Bot主动插话的最大次数，防止刷屏。0代表不限制。</div>
+      </div>
+      <div class="form-group">
+        <label for="proactive_cooldown_seconds">主动插话冷却时间 (秒)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="proactive_cooldown_seconds" min="30" max="3600" step="30" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-proactive_cooldown_seconds">0s</span>
+        </div>
+        <div class="hint-text">触发主动接话后，该群需要等待多久才能进行下一次的主动插话分析。</div>
+      </div>
+      <div class="form-group">
+        <label for="proactive_analyzer_system_prompt">【主动分析】LLM 系统提示词</label>
+        <textarea class="textarea-input" id="proactive_analyzer_system_prompt"></textarea>
+        <div class="hint-text">必须返回标准的 JSON 格式：{"should_join": "yes|no", "reason": "..."}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 4: Keywords & Image Caption -->
+  <div class="tab-panel" id="tab-keyword">
+    <div class="config-card">
+      <h2 class="section-title">兴趣关键词模式</h2>
+      <div class="form-group checkbox-row">
+        <label for="enable_keyword_trigger">启用关键词监听模式</label>
+        <label class="switch">
+          <input type="checkbox" id="enable_keyword_trigger">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="keyword_default_probability">关键词默认触发概率 (%)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="keyword_default_probability" min="0" max="100" step="5" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-keyword_default_probability">0%</span>
+        </div>
+        <div class="hint-text">当匹配到关键词且规则中未指定具体概率时，使用的默认触发回复概率。</div>
+      </div>
+      <div class="form-group checkbox-row">
+        <label for="enable_keyword_on_image">启用关键词匹配图片转述文本</label>
+        <label class="switch">
+          <input type="checkbox" id="enable_keyword_on_image">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="config-card">
+      <h2 class="section-title">兴趣关键词匹配规则</h2>
+      <div class="list-container" id="keywords-list"></div>
+      <button class="add-btn" onclick="addKeywordItem()">＋ 添加关键词规则</button>
+    </div>
+
+    <div class="config-card">
+      <h2 class="section-title">图片转述设置 (Captioning)</h2>
+      <div class="form-group checkbox-row">
+        <label for="enable_image_caption">启用图片转述 (对于非多模态模型建议开启)</label>
+        <label class="switch">
+          <input type="checkbox" id="enable_image_caption">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="image_caption_probability">即时转述匹配概率 (%)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="image_caption_probability" min="0" max="100" step="5" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-image_caption_probability">0%</span>
+        </div>
+        <div class="hint-text">在图片缓存未命中时，对新图片进行即时描述的触发概率。若准备回复构建上下文时，则强制进行100%描述。</div>
+      </div>
+      <div class="form-group">
+        <label for="image_caption_provider_id">图片转述 LLM 供应商</label>
+        <select class="select-input" id="image_caption_provider_id"></select>
+        <div class="hint-text">用于执行图片转述的多模态提供商实例，留空使用全局或会话默认设置。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 5: Delay & Batch Analysis -->
+  <div class="tab-panel" id="tab-batch">
+    <div class="config-card">
+      <h2 class="section-title">批次消息分析 (延迟回复)</h2>
+      <div class="form-group checkbox-row">
+        <label for="batch_analysis_enabled">启用延迟批次分析 (等群聊停顿后再批量处理)</label>
+        <label class="switch">
+          <input type="checkbox" id="batch_analysis_enabled">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="silence_multiplier">静默判定倍数</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="silence_multiplier" min="1.5" max="5.0" step="0.5" oninput="updateSliderValue(this, true)">
+          <span class="slider-value" id="val-silence_multiplier">0</span>
+        </div>
+        <div class="hint-text">实际停顿判定时间 = clamp(消息平均间隔 × 倍数, 最小秒数, 最大秒数)。倍数越大判定条件越宽松，等待时间越长。</div>
+      </div>
+      <div class="form-group">
+        <label for="min_silence_seconds">最小静默秒数</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="min_silence_seconds" min="2" max="10" step="1" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-min_silence_seconds">0s</span>
+        </div>
+        <div class="hint-text">无论群聊节奏多快，必须在最后一条消息后静默达到多少秒，才开始触发分析（防止抢话）。</div>
+      </div>
+      <div class="form-group">
+        <label for="max_silence_seconds">最大静默秒数</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="max_silence_seconds" min="5" max="30" step="1" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-max_silence_seconds">0s</span>
+        </div>
+        <div class="hint-text">无论群友打字多慢，消息停顿超过此秒数立刻视为这波发言结束并触发分析。</div>
+      </div>
+      <div class="form-group">
+        <label for="max_batch_wait_seconds">绝对超时秒数 (首消息开始算)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="max_batch_wait_seconds" min="5" max="60" step="5" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-max_batch_wait_seconds">0s</span>
+        </div>
+        <div class="hint-text">从批次中第一条消息开始等待的绝对超时上限，即使群聊一直疯狂刷屏，到时间也会强制分析，防止无限期拖延。</div>
+      </div>
+      <div class="form-group">
+        <label for="max_batch_messages">最大消息积攒数 (条)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="max_batch_messages" min="2" max="20" step="1" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-max_batch_messages">0</span>
+        </div>
+        <div class="hint-text">积攒的消息达到此数量时，无视静默和间隔逻辑直接触发分析，防止上下文过载。</div>
+      </div>
+      <div class="form-group checkbox-row">
+        <label for="instant_at_bot">@ 提到 Bot 时立即中断等待并触发分析</label>
+        <label class="switch">
+          <input type="checkbox" id="instant_at_bot">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="caption_timeout_seconds">图片转述最长等待超时 (秒)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="caption_timeout_seconds" min="5" max="30" step="5" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-caption_timeout_seconds">0s</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="caption_timeout_behavior">图片转述超时处理策略</label>
+        <select class="select-input" id="caption_timeout_behavior">
+          <option value="wait_then_fallback">wait_then_fallback (等待转述完成，超时用占位符)</option>
+          <option value="skip_use_url">skip_use_url (不等待直接传图片URL，非多模态降级)</option>
+          <option value="skip_use_placeholder">skip_use_placeholder (不等待直接使用占位符)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 6: Human-like Mode -->
+  <div class="tab-panel" id="tab-human">
+    <div class="config-card">
+      <h2 class="section-title">伪人模式 (自主决定活跃状态)</h2>
+      <div class="form-group checkbox-row">
+        <label for="human_like_mode">启用伪人模式 (自主规划工作/睡觉状态)</label>
+        <label class="switch">
+          <input type="checkbox" id="human_like_mode">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="wake_at_threshold">唤醒所需 @ 累计次数</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="wake_at_threshold" min="1" max="10" step="1" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-wake_at_threshold">0</span>
+        </div>
+        <div class="hint-text">Bot睡觉状态下，被不同群友连续@累计达到多少次后，强制将状态改为清醒并回复。</div>
+      </div>
+      <div class="form-group">
+        <label for="wake_window_minutes">@ 计数有效窗口 (分钟)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="wake_window_minutes" min="5" max="120" step="5" oninput="updateSliderValue(this)">
+          <span class="slider-value" id="val-wake_window_minutes">0m</span>
+        </div>
+        <div class="hint-text">累计@次数的滑动窗口有效时间，过期的@记录会被废弃重新计算。</div>
+      </div>
+      <div class="form-group">
+        <label for="typing_delay_min">发言打字随机延迟下限 (秒)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="typing_delay_min" min="0" max="10" step="0.5" oninput="updateSliderValue(this, false, 's')">
+          <span class="slider-value" id="val-typing_delay_min">0s</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="typing_delay_max">发言打字随机延迟上限 (秒)</label>
+        <div class="slider-container">
+          <input type="range" class="slider-input" id="typing_delay_max" min="0" max="10" step="0.5" oninput="updateSliderValue(this, false, 's')">
+          <span class="slider-value" id="val-typing_delay_max">0s</span>
+        </div>
+        <div class="hint-text">伪人模式开启后，在此延迟范围内随机等待后再将消息发出，模拟真人在编辑消息。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer Actions -->
+<footer class="footer-bar">
+  <button class="btn btn-secondary" onclick="loadData()">🔄 放弃更改</button>
+  <button class="btn btn-primary" id="btnSave" onclick="saveAll()">💾 保存并生效</button>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+const B = window.AstrBotPluginPage;
+if (!B) {
+  document.body.innerHTML = '<div class="container"><div class="empty-state" style="text-align:center;padding:80px 20px;color:var(--text2);font-size:16px;"><div>⚠️</div><div style="margin-top:16px;">Bridge not available</div></div></div>';
+} else {
+  await B.ready();
+  (function(){
+    const m = window.matchMedia('(prefers-color-scheme:dark)');
+    function s(d){document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light')}
+    s(m.matches);
+    m.addEventListener('change', e => s(e.matches));
+  })();
+
+  const personaSelect = document.getElementById('personaSelect');
+  const personaPrompt = document.getElementById('personaPrompt');
+  const toast = document.getElementById('toast');
+  const btnSave = document.getElementById('btnSave');
+
+  let config = {};
+  let personas = [];
+  let personaPrompts = [];
+  let providers = [];
+  let currentPersonaName = '';
+  let toastTimer = null;
+
+  // Show status toasts
+  window.showToast = function(msg, dur = 2500) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), dur);
+  }
+
+  // Switch Tab Panels
+  window.switchTab = function(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    
+    const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabName));
+    if (activeBtn) activeBtn.classList.add('active');
+    
+    const activePanel = document.getElementById(`tab-${tabName}`);
+    if (activePanel) activePanel.classList.add('active');
+  }
+
+  // Handle Range slider updates
+  window.updateSliderValue = function(element, isFloat = false, unit = '') {
+    const targetId = 'val-' + element.id;
+    const indicator = document.getElementById(targetId);
+    if (indicator) {
+      let val = element.value;
+      if (element.id.includes('probability')) {
+        indicator.textContent = val + '%';
+      } else if (element.id.includes('seconds') || element.id.includes('delay')) {
+        indicator.textContent = val + 's';
+      } else if (element.id.includes('minutes')) {
+        indicator.textContent = val + 'm';
+      } else {
+        indicator.textContent = val + unit;
+      }
+    }
+  }
+
+  // Initialize all sliders in view
+  function initSliders() {
+    document.querySelectorAll('.slider-input').forEach(slider => {
+      updateSliderValue(slider);
+    });
+  }
+
+  // Dynamic lists editors
+  // 1. Group whitelist manager
+  window.addGroupItem = function(data = {group_id: '', reply_probability: null, active_probability: null}) {
+    const list = document.getElementById('groups-list');
+    const index = list.children.length;
+    const card = document.createElement('div');
+    card.className = 'list-item-card';
+    card.innerHTML = `
+      <button class="remove-btn" onclick="this.parentElement.remove()">×</button>
+      <div class="list-grid">
+        <div class="form-group">
+          <label>群号 / UMO</label>
+          <input type="text" class="text-input group-id" value="${data.group_id || ''}" placeholder="例如 12345678">
+        </div>
+        <div class="form-group">
+          <label>独立回复概率 (%) (留空使用全局)</label>
+          <input type="number" class="text-input group-reply" value="${data.reply_probability !== null && data.reply_probability !== undefined ? data.reply_probability : ''}" placeholder="全局/默认" min="0" max="100">
+        </div>
+        <div class="form-group">
+          <label>独立主动概率 (%) (留空使用全局)</label>
+          <input type="number" class="text-input group-active" value="${data.active_probability !== null && data.active_probability !== undefined ? data.active_probability : ''}" placeholder="全局/默认" min="0" max="100">
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  }
+
+  // 2. Keyword rules manager
+  window.addKeywordItem = function(data = {groups: '', keywords: '', probability: null}) {
+    const list = document.getElementById('keywords-list');
+    const index = list.children.length;
+    const card = document.createElement('div');
+    card.className = 'list-item-card';
+    card.innerHTML = `
+      <button class="remove-btn" onclick="this.parentElement.remove()">×</button>
+      <div class="list-grid">
+        <div class="form-group" style="grid-column: span 2;">
+          <label>匹配关键字 (用英文/中文逗号分隔)</label>
+          <input type="text" class="text-input kw-keywords" value="${data.keywords || ''}" placeholder="例如: 原神,星铁">
+        </div>
+        <div class="form-group">
+          <label>生效群聊 (留空为全部群)</label>
+          <input type="text" class="text-input kw-groups" value="${data.groups || ''}" placeholder="群ID,多个用逗号隔开">
+        </div>
+        <div class="form-group">
+          <label>独立触发概率 (%) (留空默认)</label>
+          <input type="number" class="text-input kw-probability" value="${data.probability !== null && data.probability !== undefined ? data.probability : ''}" placeholder="默认" min="0" max="100">
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  }
+
+  // Render provider selections
+  function populateProviders(selectId, currentValue) {
+    const select = document.getElementById(selectId);
+    select.innerHTML = '<option value="">使用会话默认 / 留空</option>';
+    providers.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      if (p.id === currentValue) {
+        opt.selected = true;
+      }
+      select.appendChild(opt);
+    });
+  }
+
+  function parseResponse(res) {
+    if (res && res.status === 'ok' && res.data !== undefined) {
+      return res.data;
+    }
+    return res;
+  }
+
+  // Load backend configurations
+  window.loadData = async function() {
+    try {
+      btnSave.disabled = true;
+      
+      // Fetch data concurrently
+      const [personasRes, promptsRes, configRes, providersRes] = await Promise.all([
+        B.apiGet('personas'),
+        B.apiGet('persona_prompts'),
+        B.apiGet('config'),
+        B.apiGet('providers')
+      ]);
+
+      personas = parseResponse(personasRes) || [];
+      personaPrompts = parseResponse(promptsRes) || [];
+      config = parseResponse(configRes) || {};
+      providers = parseResponse(providersRes) || [];
+
+      // Render Personas Dropdown
+      personaSelect.innerHTML = '';
+      if (personas.length === 0) {
+        personaSelect.innerHTML = '<option value="">未找到系统人格角色</option>';
+      } else {
+        personas.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id || p.name;
+          opt.textContent = `${p.name} (${p.id})`;
+          personaSelect.appendChild(opt);
+        });
+        onPersonaChange();
+      }
+
+      // Populate Providers Dropdowns
+      populateProviders('analyzer_provider_id', config.analyzer_provider_id);
+      populateProviders('generator_provider_id', config.generator_provider_id);
+      populateProviders('image_caption_provider_id', config.image_caption_provider_id);
+
+      // Populate basic inputs
+      document.getElementById('trigger_mode').value = config.trigger_mode || 'llm_response';
+      document.getElementById('filter_prefixes').value = (config.filter_prefixes || []).join(', ');
+
+      // Populate slider ranges
+      const sliderKeys = [
+        'reply_probability', 'track_timeout_seconds', 'max_detection_count', 
+        'active_probability', 'max_proactive_rounds', 'proactive_cooldown_seconds',
+        'keyword_default_probability', 'image_caption_probability', 'silence_multiplier', 
+        'min_silence_seconds', 'max_silence_seconds', 'max_batch_wait_seconds', 
+        'max_batch_messages', 'caption_timeout_seconds', 'wake_at_threshold', 
+        'wake_window_minutes', 'typing_delay_min', 'typing_delay_max'
+      ];
+      sliderKeys.forEach(k => {
+        const input = document.getElementById(k);
+        if (input && config[k] !== undefined) {
+          input.value = config[k];
+        }
+      });
+
+      // Populate switches
+      const switchKeys = [
+        'enable_llm_tools', 'enable_keyword_trigger', 'enable_keyword_on_image', 
+        'enable_image_caption', 'batch_analysis_enabled', 'instant_at_bot', 'human_like_mode'
+      ];
+      switchKeys.forEach(k => {
+        const sw = document.getElementById(k);
+        if (sw && config[k] !== undefined) {
+          sw.checked = !!config[k];
+        }
+      });
+
+      // Populate select menus
+      document.getElementById('caption_timeout_behavior').value = config.caption_timeout_behavior || 'wait_then_fallback';
+
+      // Populate prompts
+      document.getElementById('analyzer_system_prompt').value = config.analyzer_system_prompt || '';
+      document.getElementById('proactive_analyzer_system_prompt').value = config.proactive_analyzer_system_prompt || '';
+
+      // Clear Whitelists lists editors
+      document.getElementById('groups-list').innerHTML = '';
+      (config.enabled_groups || []).forEach(g => addGroupItem(g));
+
+      document.getElementById('keywords-list').innerHTML = '';
+      (config.keyword_rules || []).forEach(k => addKeywordItem(k));
+
+      // Refresh indicators
+      initSliders();
+
+      btnSave.disabled = false;
+      showToast('配置数据加载成功');
+    } catch(e) {
+      console.error(e);
+      showToast('数据获取失败: ' + e.message);
+    }
+  }
+
+  // Handle selected persona change
+  window.onPersonaChange = function() {
+    const selectedVal = personaSelect.value;
+    currentPersonaName = selectedVal;
+    if (!selectedVal) {
+      personaPrompt.value = '';
+      return;
+    }
+    const found = personaPrompts.find(item => item.persona_name.toLowerCase() === selectedVal.toLowerCase());
+    personaPrompt.value = found ? (found.custom_persona_prompt || '') : '';
+  }
+
+  // Read list objects
+  function getGroupWhitelistData() {
+    const list = [];
+    document.querySelectorAll('#groups-list .list-item-card').forEach(card => {
+      const group_id = card.querySelector('.group-id').value.trim();
+      if (!group_id) return;
+      const reply_prob = card.querySelector('.group-reply').value;
+      const active_prob = card.querySelector('.group-active').value;
+      list.push({
+        group_id,
+        reply_probability: reply_prob === '' ? null : parseInt(reply_prob),
+        active_probability: active_prob === '' ? null : parseInt(active_prob),
+        __template_key: "group_template"
+      });
+    });
+    return list;
+  }
+
+  function getKeywordRulesData() {
+    const list = [];
+    document.querySelectorAll('#keywords-list .list-item-card').forEach(card => {
+      const keywords = card.querySelector('.kw-keywords').value.trim();
+      if (!keywords) return;
+      const groups = card.querySelector('.kw-groups').value.trim();
+      const prob = card.querySelector('.kw-probability').value;
+      list.push({
+        groups,
+        keywords,
+        probability: prob === '' ? null : parseInt(prob),
+        __template_key: "keyword_template"
+      });
+    });
+    return list;
+  }
+
+  // Save all settings to the backend
+  window.saveAll = async function() {
+    btnSave.disabled = true;
+    btnSave.textContent = '保存中...';
+
+    try {
+      const updatedConfig = { ...config };
+
+      // Base configuration variables
+      updatedConfig.trigger_mode = document.getElementById('trigger_mode').value;
+      updatedConfig.filter_prefixes = document.getElementById('filter_prefixes').value
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      // Model providers selection
+      updatedConfig.analyzer_provider_id = document.getElementById('analyzer_provider_id').value;
+      updatedConfig.generator_provider_id = document.getElementById('generator_provider_id').value;
+      updatedConfig.image_caption_provider_id = document.getElementById('image_caption_provider_id').value;
+
+      // Select fields
+      updatedConfig.caption_timeout_behavior = document.getElementById('caption_timeout_behavior').value;
+
+      // Textareas
+      updatedConfig.analyzer_system_prompt = document.getElementById('analyzer_system_prompt').value;
+      updatedConfig.proactive_analyzer_system_prompt = document.getElementById('proactive_analyzer_system_prompt').value;
+
+      // Number sliders
+      const numKeys = [
+        'reply_probability', 'track_timeout_seconds', 'max_detection_count', 
+        'active_probability', 'max_proactive_rounds', 'proactive_cooldown_seconds',
+        'keyword_default_probability', 'image_caption_probability', 
+        'min_silence_seconds', 'max_silence_seconds', 'max_batch_wait_seconds', 
+        'max_batch_messages', 'caption_timeout_seconds', 'wake_at_threshold', 
+        'wake_window_minutes'
+      ];
+      numKeys.forEach(k => {
+        updatedConfig[k] = parseInt(document.getElementById(k).value);
+      });
+
+      // Float sliders
+      const floatKeys = ['silence_multiplier', 'typing_delay_min', 'typing_delay_max'];
+      floatKeys.forEach(k => {
+        updatedConfig[k] = parseFloat(document.getElementById(k).value);
+      });
+
+      // Switch toggles
+      const switchKeys = [
+        'enable_llm_tools', 'enable_keyword_trigger', 'enable_keyword_on_image', 
+        'enable_image_caption', 'batch_analysis_enabled', 'instant_at_bot', 'human_like_mode'
+      ];
+      switchKeys.forEach(k => {
+        updatedConfig[k] = document.getElementById(k).checked;
+      });
+
+      // List objects
+      updatedConfig.enabled_groups = getGroupWhitelistData();
+      updatedConfig.keyword_rules = getKeywordRulesData();
+
+      // Save persona prompts first if changed
+      if (currentPersonaName) {
+        const currentPromptVal = personaPrompt.value;
+        const resPersona = await B.apiPost('persona_prompts', {
+          persona_name: currentPersonaName,
+          custom_persona_prompt: currentPromptVal
+        });
+        if (!resPersona || resPersona.status !== 'ok') {
+          throw new Error('更新人设提示词失败: ' + (resPersona?.message || '未知错误'));
+        }
+        
+        // Also update local cache of personaPrompts
+        const idx = personaPrompts.findIndex(item => item.persona_name.toLowerCase() === currentPersonaName.toLowerCase());
+        if (idx !== -1) {
+          if (currentPromptVal.trim() === '') personaPrompts.splice(idx, 1);
+          else personaPrompts[idx].custom_persona_prompt = currentPromptVal;
+        } else if (currentPromptVal.trim() !== '') {
+          personaPrompts.push({
+            persona_name: currentPersonaName,
+            custom_persona_prompt: currentPromptVal
+          });
+        }
+      }
+
+      // Save final config
+      const resConfig = await B.apiPost('config', updatedConfig);
+      if (resConfig && resConfig.status === 'ok') {
+        config = updatedConfig;
+        showToast('全部配置已成功保存并生效！');
+      } else {
+        throw new Error(resConfig?.message || '保存配置失败');
+      }
+
+    } catch (e) {
+      console.error(e);
+      showToast('保存错误: ' + e.message);
+    } finally {
+      btnSave.disabled = false;
+      btnSave.textContent = '💾 保存并生效';
+    }
+  }
+
+  // Load initially
+  loadData();
+}
+</script>
+</body>
+</html>

@@ -99,13 +99,23 @@ def parse_group_entry(entry) -> list[tuple[str, int | None, int | None]]:
         parts = entry.split(":")
 
         platforms = {
-            "aiocqhttp", "telegram", "discord", "lark", "qq_official",
-            "dingtalk", "kook", "slack", "mattermost", "satori",
+            "aiocqhttp",
+            "telegram",
+            "discord",
+            "lark",
+            "qq_official",
+            "dingtalk",
+            "kook",
+            "slack",
+            "mattermost",
+            "satori",
         }
         is_umo = False
         if len(parts) >= 3:
             if parts[0] in platforms or parts[1] in {
-                "GroupMessage", "PrivateMessage", "GuildMessage",
+                "GroupMessage",
+                "PrivateMessage",
+                "GuildMessage",
             }:
                 is_umo = True
 
@@ -171,6 +181,7 @@ class ConfigHelper:
         self.config = config
         self.parsed_groups: list[tuple[str, int | None, int | None]] = []
         self.parsed_keywords: list[tuple[list[str], set[str], int | None]] = []
+        self.parsed_persona_prompts: dict[str, str] = {}
         self.refresh()
 
     def refresh(self):
@@ -186,6 +197,15 @@ class ConfigHelper:
             parse_keyword_rule(entry) for entry in keywords if _is_valid_entry(entry)
         ]
 
+        persona_replies = self.persona_replies()
+        self.parsed_persona_prompts = {}
+        for entry in persona_replies:
+            if isinstance(entry, dict):
+                p_name = entry.get("persona_name", "").strip().lower()
+                p_prompt = entry.get("custom_persona_prompt", "")
+                if p_name:
+                    self.parsed_persona_prompts[p_name] = p_prompt
+
     def cfg(self, key: str, default=None):
         if not self.config:
             return default
@@ -196,6 +216,9 @@ class ConfigHelper:
     def trigger_mode(self) -> str:
         return str(self.cfg("trigger_mode", "llm_response"))
 
+    def filter_prefixes(self) -> list:
+        return self.cfg("filter_prefixes", ["/", "!", "#", "$"])
+
     def enable_keyword_trigger(self) -> bool:
         return bool(self.cfg("enable_keyword_trigger", False))
 
@@ -205,10 +228,20 @@ class ConfigHelper:
     def keyword_rules(self) -> list:
         return self.cfg("keyword_rules", [])
 
+    def persona_replies(self) -> list:
+        return self.cfg("persona_replies", [])
+
+    def get_custom_persona_prompt(self, persona_name: str) -> str | None:
+        if not persona_name:
+            return None
+        return self.parsed_persona_prompts.get(persona_name.strip().lower())
+
     def keyword_default_probability(self) -> int:
         return int(self.cfg("keyword_default_probability", 100))
 
-    def get_matched_keyword(self, group_id: str, content: str) -> tuple[str | None, int | None]:
+    def get_matched_keyword(
+        self, group_id: str, content: str
+    ) -> tuple[str | None, int | None]:
         """Check if content matches any keyword rule applicable to this group.
         Returns (matched_keyword, probability) or (None, None).
         """

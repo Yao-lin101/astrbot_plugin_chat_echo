@@ -117,8 +117,21 @@ class LLMHandler:
 
         try:
             personality = await self.context.persona_manager.get_default_persona_v3(umo)
-            if personality and personality.get("prompt"):
+            persona_text = ""
+            custom_prompt = self.config_helper.get_custom_persona_prompt(persona_name)
+            if not custom_prompt and personality:
+                p_name_db = personality.get("name")
+                if p_name_db:
+                    custom_prompt = self.config_helper.get_custom_persona_prompt(
+                        p_name_db
+                    )
+
+            if custom_prompt:
+                persona_text = custom_prompt.strip()
+            elif personality and personality.get("prompt"):
                 persona_text = personality["prompt"].strip()
+
+            if persona_text:
                 if identity_str:
                     persona_text = f"{identity_str}\n{persona_text}"
                 system_prompt = f"<persona>\n{persona_text}\n</persona>\n\n<task_instructions>\n{system_prompt}\n</task_instructions>"
@@ -167,9 +180,7 @@ class LLMHandler:
         self_id: str = "",
         persona_name: str = "",
     ) -> dict | None:
-        prompt = (
-            f"请分析以下群聊上下文：\n\n{context_text}\n\n请判断这些消息是否在回复你。"
-        )
+        prompt = f"请分析以下群聊上下文：\n\n{context_text}\n\n请判断现在是否需要发言。"
         provider_id = self.config_helper.analyzer_provider()
         system_prompt = self.config_helper.analyzer_prompt()
 
@@ -180,8 +191,21 @@ class LLMHandler:
 
         try:
             personality = await self.context.persona_manager.get_default_persona_v3(umo)
-            if personality and personality.get("prompt"):
+            persona_text = ""
+            custom_prompt = self.config_helper.get_custom_persona_prompt(persona_name)
+            if not custom_prompt and personality:
+                p_name_db = personality.get("name")
+                if p_name_db:
+                    custom_prompt = self.config_helper.get_custom_persona_prompt(
+                        p_name_db
+                    )
+
+            if custom_prompt:
+                persona_text = custom_prompt.strip()
+            elif personality and personality.get("prompt"):
                 persona_text = personality["prompt"].strip()
+
+            if persona_text:
                 if identity_str:
                     persona_text = f"{identity_str}\n{persona_text}"
                 system_prompt = f"<persona>\n{persona_text}\n</persona>\n\n<task_instructions>\n{system_prompt}\n</task_instructions>"
