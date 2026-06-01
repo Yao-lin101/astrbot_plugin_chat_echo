@@ -181,6 +181,7 @@ class ConfigHelper:
         self.config = config
         self.parsed_groups: list[tuple[str, int | None, int | None]] = []
         self.parsed_keywords: list[tuple[list[str], set[str], int | None]] = []
+        self.parsed_persona_prompts: dict[str, str] = {}
         self.refresh()
 
     def refresh(self):
@@ -195,6 +196,15 @@ class ConfigHelper:
         self.parsed_keywords = [
             parse_keyword_rule(entry) for entry in keywords if _is_valid_entry(entry)
         ]
+
+        persona_replies = self.persona_replies()
+        self.parsed_persona_prompts = {}
+        for entry in persona_replies:
+            if isinstance(entry, dict):
+                p_name = entry.get("persona_name", "").strip().lower()
+                p_prompt = entry.get("custom_persona_prompt", "")
+                if p_name:
+                    self.parsed_persona_prompts[p_name] = p_prompt
 
     def cfg(self, key: str, default=None):
         if not self.config:
@@ -217,6 +227,14 @@ class ConfigHelper:
 
     def keyword_rules(self) -> list:
         return self.cfg("keyword_rules", [])
+
+    def persona_replies(self) -> list:
+        return self.cfg("persona_replies", [])
+
+    def get_custom_persona_prompt(self, persona_name: str) -> str | None:
+        if not persona_name:
+            return None
+        return self.parsed_persona_prompts.get(persona_name.strip().lower())
 
     def keyword_default_probability(self) -> int:
         return int(self.cfg("keyword_default_probability", 100))

@@ -66,6 +66,7 @@
 | `reply_probability` | int | `100` | 分析概率(%)，0~100 |
 | `enable_llm_tools` | bool | `true` | 是否启用 LLM 工具/技能 |
 | `analyzer_system_prompt` | text | 默认 | 回复分析 LLM 提示词 |
+| `persona_replies` | template_list | `[]` | 专属回复分析人设提示词列表。可为不同的人格设置简化的专属回复分析人设 |
 
 ### 主动模式 (Route 2)
 
