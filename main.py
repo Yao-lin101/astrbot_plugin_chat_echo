@@ -317,6 +317,14 @@ class EchoPlugin(Star):
 
         group_id = str(event.get_group_id())
         umo = event.unified_msg_origin
+
+        activated_handlers = event.get_extra("activated_handlers", [])
+        self.logger.info(
+            f"[ChatEcho Debug] on_group_message: msg='{event.message_str}', is_at_or_wake={event.is_at_or_wake_command}, "
+            f"is_wake={event.is_wake}, stopped={event.is_stopped()}, "
+            f"handlers={[h.handler_name for h in activated_handlers]}"
+        )
+
         if not self.config_helper.is_group_allowed(group_id, umo):
             return
 
