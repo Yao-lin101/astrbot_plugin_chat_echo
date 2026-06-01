@@ -13,7 +13,7 @@ from pathlib import Path
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.event.filter import EventMessageType
-from astrbot.api.message_components import At, Reply
+from astrbot.api.message_components import At, AtAll, Plain, Reply
 from astrbot.api.star import Context, Star, StarTools, register
 from astrbot.core.provider.entities import ProviderRequest
 
@@ -326,6 +326,19 @@ class EchoPlugin(Star):
                 if cmd_text.startswith(prefix):
                     return  # 指令消息，跳过全部处理
 
+        # Check if there are other commands/handlers to avoid intercepting them
+        activated_handlers = event.get_extra("activated_handlers", [])
+        has_other_handlers = False
+        for handler in activated_handlers:
+            if handler.handler_name != "on_group_message":
+                has_other_handlers = True
+                break
+        if has_other_handlers:
+            return
+
+        # Intercept the native wake/at-bot LLM trigger, let the plugin determine if it should respond
+        event.is_at_or_wake_command = False
+
         now = time.time()
 
         is_bot = False
@@ -383,7 +396,26 @@ class EchoPlugin(Star):
             ):
                 is_at_bot = True
 
-        msg_content = event.message_str or ""
+        # Reconstruct message content including @ tags
+        reconstructed_content = ""
+        for comp in event.get_messages():
+            if isinstance(comp, Plain):
+                reconstructed_content += comp.text
+            elif isinstance(comp, At):
+                at_target = str(getattr(comp, "qq", getattr(comp, "target", "")))
+                name = getattr(comp, "name", "")
+                if at_target == str(self_id):
+                    reconstructed_content += f"@{persona_name or 'Bot'}"
+                elif name:
+                    reconstructed_content += f"@{name}"
+                else:
+                    reconstructed_content += f"@{at_target}"
+            elif isinstance(comp, AtAll):
+                reconstructed_content += "@全体成员"
+
+        msg_content = reconstructed_content.strip()
+        if not msg_content:
+            msg_content = event.message_str or ""
         if not msg_content.strip():
             msg_content = event.get_message_outline()
 
