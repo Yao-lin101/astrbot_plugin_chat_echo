@@ -111,6 +111,24 @@ class EchoPlugin(Star):
             ["POST"],
             "更新转述内容",
         )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/personas",
+            self.api_personas_list,
+            ["GET"],
+            "获取系统人格列表",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/persona_prompts",
+            self.api_persona_prompts_get,
+            ["GET"],
+            "获取自定义人格提示词配置",
+        )
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/persona_prompts",
+            self.api_persona_prompts_set,
+            ["POST"],
+            "更新自定义人格提示词配置",
+        )
 
     async def initialize(self):
         self.logger.info(
@@ -1151,6 +1169,121 @@ class EchoPlugin(Star):
                     self.tracker_manager.set_schedule_timer(group_id, task)
             except (ValueError, AttributeError):
                 pass
+
+    async def api_personas_list(self):
+        """GET handler: return list of all system personas."""
+        try:
+            from quart import jsonify
+
+            personas_list = []
+
+            raw_personas = []
+            if hasattr(self.context, "provider_manager") and hasattr(
+                self.context.provider_manager, "personas"
+            ):
+                raw_personas = self.context.provider_manager.personas
+            elif hasattr(self.context, "persona_manager") and hasattr(
+                self.context.persona_manager, "personas_v3"
+            ):
+                raw_personas = self.context.persona_manager.personas_v3
+
+            for p in raw_personas:
+                if isinstance(p, dict):
+                    name = p.get("name", "")
+                    prompt = p.get("prompt", "")
+                else:
+                    name = getattr(p, "name", "")
+                    prompt = getattr(p, "prompt", "")
+
+                if name:
+                    personas_list.append({"name": name, "id": name, "prompt": prompt})
+
+            return jsonify(personas_list)
+        except Exception as e:
+            from quart import jsonify
+
+            self.logger.exception(f"Failed to get personas list: {e}")
+            return jsonify([])
+
+    async def api_persona_prompts_get(self):
+        """GET handler: return current custom persona prompt list."""
+        try:
+            from quart import jsonify
+
+            persona_replies = self.config_helper.persona_replies() or []
+            return jsonify(persona_replies)
+        except Exception as e:
+            from quart import jsonify
+
+            self.logger.exception(f"Failed to get persona prompts: {e}")
+            return jsonify([])
+
+    async def api_persona_prompts_set(self):
+        """POST handler: update or delete a custom persona prompt configuration."""
+        try:
+            from quart import jsonify
+            from quart import request as qreq
+
+            body = await qreq.get_json()
+            if not body:
+                return jsonify({"status": "error", "message": "Request body is empty"})
+
+            persona_name = body.get("persona_name", "").strip()
+            custom_persona_prompt = body.get("custom_persona_prompt", "")
+
+            if not persona_name:
+                return jsonify(
+                    {"status": "error", "message": "persona_name is required"}
+                )
+
+            # Get current persona prompts list
+            persona_replies = self.config_helper.persona_replies() or []
+            # Make sure it's a list we can mutate
+            persona_replies = list(persona_replies)
+
+            # Find if this persona already has an entry
+            found_idx = -1
+            for idx, entry in enumerate(persona_replies):
+                if (
+                    isinstance(entry, dict)
+                    and entry.get("persona_name", "").lower() == persona_name.lower()
+                ):
+                    found_idx = idx
+                    break
+
+            if custom_persona_prompt.strip() == "":
+                # Delete entry if prompt is empty
+                if found_idx != -1:
+                    persona_replies.pop(found_idx)
+            else:
+                # Add or update entry
+                new_entry = {
+                    "persona_name": persona_name,
+                    "custom_persona_prompt": custom_persona_prompt,
+                }
+                if found_idx != -1:
+                    persona_replies[found_idx] = new_entry
+                else:
+                    persona_replies.append(new_entry)
+
+            # Save configuration
+            if isinstance(self.config, dict):
+                self.config["persona_replies"] = persona_replies
+            else:
+                setattr(self.config, "persona_replies", persona_replies)
+
+            if hasattr(self.config, "save_config"):
+                self.config.save_config()
+
+            # Refresh config helper cache
+            self.config_helper.refresh()
+
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            from quart import jsonify
+
+            self.logger.exception(f"Failed to save persona prompt: {e}")
+            return jsonify({"status": "error", "message": str(e)})
 
     async def terminate(self):
         self.logger.info("主动接话插件卸载中...")
