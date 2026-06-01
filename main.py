@@ -6,7 +6,6 @@ Refactored for improved maintainability.
 
 import asyncio
 import json
-import random
 import time
 from datetime import datetime
 from pathlib import Path
@@ -22,12 +21,11 @@ from .config import ConfigHelper, upgrade_config
 from .handlers import (
     handle_keyword,
     handle_proactive,
+    handle_proactive_batch,
     handle_reply,
     handle_reply_batch,
-    handle_proactive_batch,
     prewarm_captions,
     start_tracking,
-    ensure_context_captions,
 )
 from .helpers import (
     extract_bot_text,
@@ -276,7 +274,11 @@ class EchoPlugin(Star):
         name = state.get("name", "空闲")
         reason = state.get("reason", "")
         activity = state.get("activity", 1.0)
-        msg = f"{name}（活跃度: {activity}）— {reason}" if reason else f"{name}（活跃度: {activity}）"
+        msg = (
+            f"{name}（活跃度: {activity}）— {reason}"
+            if reason
+            else f"{name}（活跃度: {activity}）"
+        )
         yield event.plain_result(msg)
 
     @filter.command("bot计划表")
@@ -302,7 +304,9 @@ class EchoPlugin(Star):
             a = item.get("activity", 0)
             u = item.get("until", "?")
             r = item.get("reason", "")
-            lines.append(f"{s} (活跃度 {a}) 至 {u} — {r}" if r else f"{s} (活跃度 {a}) 至 {u}")
+            lines.append(
+                f"{s} (活跃度 {a}) 至 {u} — {r}" if r else f"{s} (活跃度 {a}) 至 {u}"
+            )
         yield event.plain_result("\n".join(lines))
 
     @filter.event_message_type(EventMessageType.ALL)
@@ -437,7 +441,12 @@ class EchoPlugin(Star):
                         )
                         self.tracker_manager.set_state(
                             group_id,
-                            {"name": "空闲", "activity": 1.0, "reason": "被@吵醒了", "manual": True},
+                            {
+                                "name": "空闲",
+                                "activity": 1.0,
+                                "reason": "被@吵醒了",
+                                "manual": True,
+                            },
                         )
                         self.tracker_manager.clear_wake_hits(group_id)
                         scale = 1.0  # 唤醒后活跃度恢复
@@ -455,11 +464,9 @@ class EchoPlugin(Star):
             self._activity_scale = 1.0
 
         # ====== Keyword Trigger (Route 3) ======
-        tracker = self.tracker_manager.get_tracker(group_id)
         if (
             self.config_helper.enable_keyword_trigger()
             and self.config_helper.parsed_keywords
-            and not (tracker and tracker.alive)  # 有活跃reply tracker时跳过关键词，让reply路由处理
         ):
             matched_keyword, matched_prob = self.config_helper.get_matched_keyword(
                 group_id, msg_content
@@ -513,7 +520,9 @@ class EchoPlugin(Star):
                 # Also collect in legacy list (for compatibility with existing handlers)
                 tracker.collected.append(msg)
 
-                if tracker.analyzing or self.tracker_manager.is_active_thinking(group_id):
+                if tracker.analyzing or self.tracker_manager.is_active_thinking(
+                    group_id
+                ):
                     return
 
                 # Start background caption for message images (fire-and-forget)
@@ -532,7 +541,8 @@ class EchoPlugin(Star):
                             event.set_extra("chat_echo_triggered", True)
                             event.set_extra("chat_echo_mode", "reply")
                             event.set_extra(
-                                "selected_provider", self.config_helper.generator_provider()
+                                "selected_provider",
+                                self.config_helper.generator_provider(),
                             )
                             self.tracker_manager.set_active_thinking(group_id, True)
                             return
@@ -556,7 +566,9 @@ class EchoPlugin(Star):
                     tracker.batch_timer.cancel()
                     tracker.batch_timer = None
 
-                silence_delay = self.tracker_manager.compute_silence_delay(tracker, self)
+                silence_delay = self.tracker_manager.compute_silence_delay(
+                    tracker, self
+                )
                 # Also respect absolute timeout
                 max_wait = self.config_helper.max_batch_wait_seconds()
                 elapsed = now - tracker.batch_first_msg_time
@@ -565,7 +577,9 @@ class EchoPlugin(Star):
                     f"[Batch] Scheduling flush in {remaining:.1f}s for group {group_id} (silence={silence_delay:.1f}s, max_wait={max_wait}s)"
                 )
                 tracker.batch_timer = asyncio.create_task(
-                    self._schedule_batch_flush_reply(tracker, event, group_id, umo, remaining)
+                    self._schedule_batch_flush_reply(
+                        tracker, event, group_id, umo, remaining
+                    )
                 )
                 return
 
@@ -610,9 +624,7 @@ class EchoPlugin(Star):
         if self.config_helper.enable_image_caption() and image_urls:
             await prewarm_captions(self, msg, umo)
 
-        trigger_now = self.tracker_manager.add_to_proactive_batch(
-            group_id, msg, self
-        )
+        trigger_now = self.tracker_manager.add_to_proactive_batch(group_id, msg, self)
         if trigger_now:
             self.logger.info(
                 f"[ProactiveBatch] Immediate flush triggered by {trigger_now['reason']} in group {group_id}"
@@ -652,9 +664,7 @@ class EchoPlugin(Star):
 
     # ======== Batch flush methods ========
 
-    async def _schedule_batch_flush_reply(
-        self, tracker, event, group_id, umo, delay
-    ):
+    async def _schedule_batch_flush_reply(self, tracker, event, group_id, umo, delay):
         """Wait for dynamic silence period, then flush reply batch."""
         try:
             await asyncio.sleep(delay)
@@ -1036,6 +1046,7 @@ class EchoPlugin(Star):
                 schedule = json.loads(text.strip())
             except json.JSONDecodeError:
                 import re
+
                 m = re.search(r"\[.*\]", text, re.DOTALL)
                 if m:
                     try:
@@ -1057,7 +1068,6 @@ class EchoPlugin(Star):
 
     def _apply_schedule(self, group_id: str, schedule: list, now_dt: datetime) -> None:
         """Set current state from schedule and start timer for next transition."""
-        now_ts = time.time()
         today = now_dt.date()
         current_match = None
         next_item = None
@@ -1082,11 +1092,14 @@ class EchoPlugin(Star):
         if current_state.get("manual"):
             self.tracker_manager.set_state(group_id, {**current_state, "manual": False})
         elif current_match:
-            self.tracker_manager.set_state(group_id, {
-                "name": current_match.get("state", "空闲"),
-                "activity": float(current_match.get("activity", 1.0)),
-                "reason": current_match.get("reason", ""),
-            })
+            self.tracker_manager.set_state(
+                group_id,
+                {
+                    "name": current_match.get("state", "空闲"),
+                    "activity": float(current_match.get("activity", 1.0)),
+                    "reason": current_match.get("reason", ""),
+                },
+            )
             self.logger.info(
                 f"[HumanMode] {group_id} state: {current_match.get('state')} (activity={current_match.get('activity')})"
             )
@@ -1097,13 +1110,16 @@ class EchoPlugin(Star):
                 target = datetime(today.year, today.month, today.day, h, m)
                 if target <= now_dt:
                     from datetime import timedelta
+
                     target += timedelta(days=1)
                 delay = (target - datetime.now()).total_seconds()
                 if delay > 0:
+
                     async def _transition():
                         await asyncio.sleep(delay)
                         dt = datetime.now()
                         self._apply_schedule(group_id, schedule, dt)
+
                     task = asyncio.create_task(_transition())
                     self.tracker_manager.set_schedule_timer(group_id, task)
             except (ValueError, AttributeError):

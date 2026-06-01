@@ -138,7 +138,7 @@ class LLMHandler:
                     f"<task_instructions>\n{system_prompt}\n</task_instructions>"
                 )
 
-        self.logger.debug(
+        self.logger.info(
             f"\n[AnalyzerPrompt] === Proactive Analysis LLM Call ===\n"
             f"--- System Prompt ---\n{system_prompt}\n"
             f"--- User Prompt ---\n{prompt}\n"
@@ -167,9 +167,7 @@ class LLMHandler:
         self_id: str = "",
         persona_name: str = "",
     ) -> dict | None:
-        prompt = (
-            f"请分析以下群聊上下文：\n\n{context_text}\n\n请判断这些消息是否在回复你。"
-        )
+        prompt = f"请分析以下群聊上下文：\n\n{context_text}\n\n请判断现在是否需要发言。"
         provider_id = self.config_helper.analyzer_provider()
         system_prompt = self.config_helper.analyzer_prompt()
 
@@ -201,7 +199,7 @@ class LLMHandler:
                     f"<task_instructions>\n{system_prompt}\n</task_instructions>"
                 )
 
-        self.logger.debug(
+        self.logger.info(
             f"\n[AnalyzerPrompt] === Reply Analysis LLM Call ===\n"
             f"--- System Prompt ---\n{system_prompt}\n"
             f"--- User Prompt ---\n{prompt}\n"

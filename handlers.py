@@ -38,13 +38,7 @@ def build_analyze_context(tracker: ConversationTracker) -> tuple[str, list[str]]
             f"[仅显示最近 {MAX_CONTEXT_MESSAGES} 条消息, 共 {len(tracker.collected)} 条]"
         )
     for msg in collected:
-        hints = []
-        if msg.get("is_at_bot"):
-            hints.append("此消息@了你或提到了你的名字/ID")
-        elif msg.get("is_at_other"):
-            hints.append("此消息@了或回复了其他人，不是你")
-        hint_str = f" (提示：{', '.join(hints)})" if hints else ""
-        lines.append(f"{idx}. {msg['user_name']}: {msg['content']}{hint_str}")
+        lines.append(f"{idx}. {msg['user_name']}: {msg['content']}")
         idx += 1
         if msg.get("image_urls"):
             all_image_urls.extend(msg["image_urls"])
@@ -75,13 +69,7 @@ def build_batch_context(
             f"[仅显示最近 {MAX_CONTEXT_MESSAGES} 条消息, 本批次共 {len(batch_messages)} 条]"
         )
     for msg in batch:
-        hints = []
-        if msg.get("is_at_bot"):
-            hints.append("此消息@了你或提到了你的名字/ID")
-        elif msg.get("is_at_other"):
-            hints.append("此消息@了或回复了其他人，不是你")
-        hint_str = f" (提示：{', '.join(hints)})" if hints else ""
-        lines.append(f"{idx}. {msg['user_name']}: {msg['content']}{hint_str}")
+        lines.append(f"{idx}. {msg['user_name']}: {msg['content']}")
         idx += 1
         if msg.get("image_urls"):
             all_image_urls.extend(msg["image_urls"])
@@ -94,13 +82,7 @@ def build_proactive_batch_context(batch_messages: list[dict]) -> tuple[str, list
     context_lines.append("[以下为本批次积累的消息，请综合判断是否应该参与讨论:]")
     all_image_urls = []
     for m in batch_messages:
-        hints = []
-        if m.get("is_at_bot"):
-            hints.append("此消息@了你或提到了你的名字/ID")
-        elif m.get("is_at_other"):
-            hints.append("此消息@了或回复了其他人，不是你")
-        hint_str = f" (提示：{', '.join(hints)})" if hints else ""
-        context_lines.append(f"{m['user_name']}: {m['content']}{hint_str}")
+        context_lines.append(f"{m['user_name']}: {m['content']}")
         if m.get("image_urls"):
             all_image_urls.extend(m["image_urls"])
     context_text = "\n".join(context_lines)
@@ -151,7 +133,9 @@ async def start_tracking(
         plugin.token_counter.set_group_name(group_id, gname)
 
 
-async def ensure_context_captions(plugin, messages: list[dict], umo: str) -> list[asyncio.Task]:
+async def ensure_context_captions(
+    plugin, messages: list[dict], umo: str
+) -> list[asyncio.Task]:
     """Lazily caption any uncaptioned images in the message list in-place.
     Returns list of background caption tasks (fire-and-forget).
     """
@@ -185,9 +169,7 @@ async def prewarm_captions(plugin, msg: dict, umo: str) -> list[asyncio.Task]:
         return tasks
     for url in image_urls:
         # Fire-and-forget: start captioning in background, result goes to cache
-        task = asyncio.create_task(
-            plugin.get_image_caption(url, umo, force=True)
-        )
+        task = asyncio.create_task(plugin.get_image_caption(url, umo, force=True))
         tasks.append(task)
     return tasks
 
@@ -260,7 +242,9 @@ async def handle_reply(
 
 
 async def handle_reply_batch(
-    plugin, tracker: ConversationTracker, event: AstrMessageEvent,
+    plugin,
+    tracker: ConversationTracker,
+    event: AstrMessageEvent,
     batch_messages: list[dict],
 ) -> bool:
     """Batch version of handle_reply: analyze accumulated batch messages at once.
@@ -352,13 +336,7 @@ async def handle_proactive(
         context_lines = ["=== 群聊中的最近消息 ==="]
         all_image_urls = []
         for m in recent_window:
-            hints = []
-            if m.get("is_at_bot"):
-                hints.append("此消息@了你或提到了你的名字/ID")
-            elif m.get("is_at_other"):
-                hints.append("此消息@了或回复了其他人，不是你")
-            hint_str = f" (提示：{', '.join(hints)})" if hints else ""
-            context_lines.append(f"{m['user_name']}: {m['content']}{hint_str}")
+            context_lines.append(f"{m['user_name']}: {m['content']}")
             if m.get("image_urls"):
                 all_image_urls.extend(m["image_urls"])
         context_text = "\n".join(context_lines)
@@ -420,7 +398,9 @@ async def handle_proactive(
 
 
 async def handle_proactive_batch(
-    plugin, event: AstrMessageEvent, batch_messages: list[dict],
+    plugin,
+    event: AstrMessageEvent,
+    batch_messages: list[dict],
 ) -> bool:
     """Batch version of handle_proactive: analyze accumulated batch messages at once."""
     group_id = str(event.get_group_id())
@@ -487,7 +467,9 @@ async def handle_proactive_batch(
         return True
 
     except Exception as e:
-        plugin.logger.exception(f"[ProactiveBatch] Error in handle_proactive_batch: {e}")
+        plugin.logger.exception(
+            f"[ProactiveBatch] Error in handle_proactive_batch: {e}"
+        )
         return False
     finally:
         plugin.tracker_manager.set_active_thinking(group_id, False)

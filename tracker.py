@@ -154,9 +154,7 @@ class TrackerManager:
 
         return None
 
-    def compute_silence_delay(
-        self, tracker: ConversationTracker, plugin
-    ) -> float:
+    def compute_silence_delay(self, tracker: ConversationTracker, plugin) -> float:
         """Compute dynamic silence threshold for this batch."""
         if len(tracker.batch_buffer) <= 1:
             # Only one message in buffer, use minimum silence
@@ -204,9 +202,7 @@ class TrackerManager:
             }
         return self._proactive_buffers[group_id]
 
-    def add_to_proactive_batch(
-        self, group_id: str, msg: dict, plugin
-    ) -> dict | None:
+    def add_to_proactive_batch(self, group_id: str, msg: dict, plugin) -> dict | None:
         """Add message to proactive batch buffer. Returns trigger_info or None."""
         now = time.time()
         buf = self.ensure_proactive_buffer(group_id, "")
