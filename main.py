@@ -13,7 +13,7 @@ from pathlib import Path
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.event.filter import EventMessageType
-from astrbot.api.message_components import At, AtAll, Plain, Reply
+from astrbot.api.message_components import At, Reply
 from astrbot.api.star import Context, Star, StarTools, register
 from astrbot.core.provider.entities import ProviderRequest
 
@@ -396,28 +396,15 @@ class EchoPlugin(Star):
             ):
                 is_at_bot = True
 
-        # Reconstruct message content including @ tags
-        reconstructed_content = ""
-        for comp in event.get_messages():
-            if isinstance(comp, Plain):
-                reconstructed_content += comp.text
-            elif isinstance(comp, At):
-                at_target = str(getattr(comp, "qq", getattr(comp, "target", "")))
-                name = getattr(comp, "name", "")
-                if at_target == str(self_id):
-                    reconstructed_content += f"@{persona_name or 'Bot'}"
-                elif name:
-                    reconstructed_content += f"@{name}"
-                else:
-                    reconstructed_content += f"@{at_target}"
-            elif isinstance(comp, AtAll):
-                reconstructed_content += "@全体成员"
-
-        msg_content = reconstructed_content.strip()
-        if not msg_content:
-            msg_content = event.message_str or ""
+        msg_content = event.message_str or ""
         if not msg_content.strip():
             msg_content = event.get_message_outline()
+
+        # If the bot is @-ed but the @ tag was stripped as a wake prefix, prepend it to help LLM recognize it
+        if is_at_bot:
+            bot_tag = f"@{persona_name or 'Bot'}"
+            if bot_tag not in msg_content and f"@{self_id}" not in msg_content:
+                msg_content = f"{bot_tag} {msg_content}"
 
         image_urls = await extract_image_urls(event)
         if (
