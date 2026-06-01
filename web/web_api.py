@@ -278,7 +278,7 @@ class EchoWebApi:
                 new_entry = {
                     "persona_name": persona_name,
                     "custom_persona_prompt": custom_persona_prompt,
-                    "_template": "persona_reply_template",
+                    "__template_key": "persona_reply_template",
                 }
                 if found_idx != -1:
                     persona_replies[found_idx] = new_entry
