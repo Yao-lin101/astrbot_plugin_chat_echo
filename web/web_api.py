@@ -80,6 +80,24 @@ class EchoWebApi:
             ["POST"],
             "更新自定义人格提示词配置",
         )
+        self.context.register_web_api(
+            f"/{PLUGIN_NAME}/config",
+            self.api_config_get,
+            ["GET"],
+            "获取插件配置",
+        )
+        self.context.register_web_api(
+            f"/{PLUGIN_NAME}/config",
+            self.api_config_set,
+            ["POST"],
+            "更新插件配置",
+        )
+        self.context.register_web_api(
+            f"/{PLUGIN_NAME}/providers",
+            self.api_providers_list,
+            ["GET"],
+            "获取可用的模型供应商",
+        )
 
     async def page_token_stats(self):
         try:
@@ -301,3 +319,56 @@ class EchoWebApi:
         except Exception as e:
             self.logger.exception(f"Failed to save persona prompt: {e}")
             return jsonify({"status": "error", "message": str(e)})
+
+    async def api_config_get(self):
+        """GET handler: return current configuration."""
+        try:
+            config_data = {}
+            if self.plugin.config is not None:
+                config_data = dict(self.plugin.config)
+            return jsonify({"status": "ok", "data": config_data})
+        except Exception as e:
+            self.logger.exception(f"Failed to get config: {e}")
+            return jsonify({"status": "error", "message": str(e)})
+
+    async def api_config_set(self):
+        """POST handler: update and save configuration."""
+        try:
+            body = await qreq.get_json()
+            if not body:
+                return jsonify({"status": "error", "message": "Request body is empty"})
+
+            if isinstance(self.plugin.config, dict):
+                for k, v in body.items():
+                    self.plugin.config[k] = v
+            else:
+                for k, v in body.items():
+                    setattr(self.plugin.config, k, v)
+
+            if hasattr(self.plugin.config, "save_config"):
+                self.plugin.config.save_config()
+
+            self.config_helper.refresh()
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            self.logger.exception(f"Failed to save config: {e}")
+            return jsonify({"status": "error", "message": str(e)})
+
+    async def api_providers_list(self):
+        """GET handler: return list of active model providers."""
+        try:
+            providers = []
+            if hasattr(self.context, "provider_manager") and hasattr(
+                self.context.provider_manager, "provider_insts"
+            ):
+                for p in self.context.provider_manager.provider_insts:
+                    p_id = getattr(p, "id", None)
+                    if not p_id and hasattr(p, "meta"):
+                        meta = p.meta()
+                        p_id = getattr(meta, "id", None)
+                    if p_id:
+                        providers.append({"id": p_id, "name": p_id})
+            return jsonify({"status": "ok", "data": providers})
+        except Exception as e:
+            self.logger.exception(f"Failed to get providers list: {e}")
+            return jsonify({"status": "ok", "data": []})
