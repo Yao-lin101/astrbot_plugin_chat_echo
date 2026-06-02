@@ -19,8 +19,9 @@ class ImageCaptionCache:
     def _init_db(self):
         try:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
-            conn = sqlite3.connect(str(self.db_path))
+            conn = sqlite3.connect(str(self.db_path), timeout=30)
             cursor = conn.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS caption_cache (

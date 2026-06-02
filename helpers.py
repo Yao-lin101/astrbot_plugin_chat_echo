@@ -1,3 +1,4 @@
+import asyncio
 import random
 
 from astrbot.api.event import AstrMessageEvent
@@ -120,6 +121,8 @@ async def compress_image_if_needed(image_url: str) -> str:
                     (MAX_DIMENSION, MAX_DIMENSION), PILImage.Resampling.LANCZOS
                 )
 
+            import uuid
+
             compressed_path = temp_dir / f"chat_echo_compressed_{uuid.uuid4().hex}.jpg"
             img.save(compressed_path, format="JPEG", quality=85, optimize=True)
 
@@ -131,5 +134,16 @@ async def compress_image_if_needed(image_url: str) -> str:
 
             return str(compressed_path)
     except Exception as e:
+        from astrbot import logger
+
         logger.warning(f"[ChatEcho] Failed to check or compress image {image_url}: {e}")
         return local_path if (local_path and os.path.exists(local_path)) else image_url
+
+
+async def maybe_typing_delay(plugin) -> None:
+    """Apply random typing delay if human_like_mode is enabled."""
+    if plugin.config_helper.human_like_mode():
+        d_min = plugin.config_helper.typing_delay_min()
+        d_max = plugin.config_helper.typing_delay_max()
+        if d_max > 0:
+            await asyncio.sleep(random.uniform(d_min, d_max))

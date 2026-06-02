@@ -362,3 +362,6 @@ class ConfigHelper:
 
     def caption_timeout_behavior(self) -> str:
         return str(self.cfg("caption_timeout_behavior", "wait_then_fallback"))
+
+    def filter_prefixes(self) -> list[str]:
+        return self.cfg("filter_prefixes", ["/", "!", "#", "$"])

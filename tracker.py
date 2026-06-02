@@ -144,19 +144,20 @@ class TrackerManager:
         if len(tracker.batch_buffer) >= plugin.config_helper.max_batch_messages():
             return {"reason": "batch_full", "at": now}
 
-        # Check if @bot triggers instant flush (reply mode only)
+        # Check if @bot or wake command triggers instant flush (reply mode only)
         if (
-            msg.get("is_at_bot")
+            (msg.get("is_at_bot") or msg.get("is_wake"))
             and plugin.config_helper.instant_at_bot()
             and tracker.batch_mode == "reply"
         ):
-            return {"reason": "at_bot", "at": now}
+            return {
+                "reason": "at_bot" if msg.get("is_at_bot") else "wake_prefix",
+                "at": now,
+            }
 
         return None
 
-    def compute_silence_delay(
-        self, tracker: ConversationTracker, plugin
-    ) -> float:
+    def compute_silence_delay(self, tracker: ConversationTracker, plugin) -> float:
         """Compute dynamic silence threshold for this batch."""
         if len(tracker.batch_buffer) <= 1:
             # Only one message in buffer, use minimum silence
@@ -204,9 +205,7 @@ class TrackerManager:
             }
         return self._proactive_buffers[group_id]
 
-    def add_to_proactive_batch(
-        self, group_id: str, msg: dict, plugin
-    ) -> dict | None:
+    def add_to_proactive_batch(self, group_id: str, msg: dict, plugin) -> dict | None:
         """Add message to proactive batch buffer. Returns trigger_info or None."""
         now = time.time()
         buf = self.ensure_proactive_buffer(group_id, "")

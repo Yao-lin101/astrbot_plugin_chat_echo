@@ -1,0 +1,7 @@
+{
+  "pages": {
+    "admin": { "title": "Settings" },
+    "caption_cache": { "title": "Image Cache" },
+    "token_stats": { "title": "Token Stats" }
+  }
+}

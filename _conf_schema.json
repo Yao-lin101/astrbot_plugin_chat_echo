@@ -362,6 +362,31 @@
       "step": 0.5
     }
   },
+  "persona_replies": {
+    "type": "template_list",
+    "description": "专属回复分析人设提示词",
+    "hint": "为不同的人格设置专属的回复分析提示词人设部分。若未设置或为空，则默认降级为该人格的完整人设提示词。",
+    "default": [],
+    "templates": {
+      "persona_reply_template": {
+        "name": "人设配置",
+        "items": {
+          "persona_name": {
+            "type": "string",
+            "description": "人格名称",
+            "hint": "输入对应的人格名称（如 default, Arisu 等）",
+            "default": ""
+          },
+          "custom_persona_prompt": {
+            "type": "text",
+            "description": "专属回复分析人设提示词",
+            "hint": "在此人格下进行回复/参与分析时使用的专属人设。留空则使用该人格的完整人设。",
+            "default": ""
+          }
+        }
+      }
+    }
+  },
   "filter_prefixes": {
     "type": "list",
     "description": "指令过滤前缀",

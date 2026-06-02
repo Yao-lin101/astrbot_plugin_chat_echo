@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>主动接话插件控制台</title>
+<style>
+/* ===== Shared Variables ===== */
+:root {
+  --bg: #f5f5f7; --text: #1d1d1f; --text2: #86868b; --text3: #aeaeb2;
+  --card: rgba(255,255,255,0.72); --card-border: rgba(255,255,255,0.8);
+  --card-shadow: 0 8px 40px rgba(0,0,0,0.06); --accent: #0071e3;
+  --accent-light: rgba(0,113,227,0.08); --gradient1: linear-gradient(135deg,#0071e3,#5856d6);
+  --divider: rgba(0,0,0,0.06); --input-bg: rgba(0,0,0,0.04);
+  --input-border: rgba(0,0,0,0.1); --success: #34c759; --success-bg: rgba(52,199,89,0.08);
+  --success-hover: rgba(52,199,89,0.15); --info: #0071e3;
+  --info-bg: rgba(0,113,227,0.08); --danger: #ff3b30;
+  --danger-bg: rgba(255,59,48,0.08); --danger-hover: rgba(255,59,48,0.15);
+  --segment-bg: rgba(0,0,0,0.06); --segment-active: #fff;
+  --segment-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  --rank-bg: rgba(0,0,0,0.04); --rank-bar: linear-gradient(90deg,#0071e3,#5856d6);
+  --tag-bg: rgba(0,113,227,0.08); --tag-text: #0071e3;
+  --legend-bg: rgba(0,0,0,0.04); --overlay: rgba(0,0,0,0.4);
+  --modal-bg: rgba(255,255,255,0.95); --img-placeholder: rgba(0,0,0,0.04);
+}
+html[data-theme="dark"] {
+  --bg: #000; --text: #f5f5f7; --text2: #86868b; --text3: #48484a;
+  --card: rgba(28,28,30,0.78); --card-border: rgba(255,255,255,0.06);
+  --card-shadow: 0 8px 40px rgba(0,0,0,0.4); --accent: #2997ff;
+  --accent-light: rgba(41,151,255,0.12); --gradient1: linear-gradient(135deg,#2997ff,#5e5ce6);
+  --divider: rgba(255,255,255,0.06); --input-bg: rgba(255,255,255,0.06);
+  --input-border: rgba(255,255,255,0.1); --success: #30d158;
+  --success-bg: rgba(48,209,88,0.12); --success-hover: rgba(48,209,88,0.2);
+  --info: #2997ff; --info-bg: rgba(41,151,255,0.12); --danger: #ff453a;
+  --danger-bg: rgba(255,69,58,0.12); --danger-hover: rgba(255,69,58,0.2);
+  --segment-bg: rgba(255,255,255,0.08); --segment-active: rgba(255,255,255,0.15);
+  --segment-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --rank-bg: rgba(255,255,255,0.04); --rank-bar: linear-gradient(90deg,#2997ff,#5e5ce6);
+  --tag-bg: rgba(41,151,255,0.12); --tag-text: #2997ff;
+  --legend-bg: rgba(255,255,255,0.06); --overlay: rgba(0,0,0,0.6);
+  --modal-bg: rgba(28,28,30,0.95); --img-placeholder: rgba(255,255,255,0.06);
+}
+* { box-sizing:border-box; margin:0; padding:0 }
+html { -webkit-font-smoothing:antialiased }
+body { font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .4s,color .4s;padding-bottom:80px }
+.bg-glow { position:fixed;top:-20%;left:-10%;width:60%;height:60%;background:radial-gradient(ellipse,rgba(0,113,227,0.04) 0%,transparent 70%);pointer-events:none;z-index:0 }
+html[data-theme="dark"] .bg-glow { background:radial-gradient(ellipse,rgba(41,151,255,0.05) 0%,transparent 70%) }
+.container { max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:1 }
+header { padding:40px 0 20px;text-align:center }
+header h1 { font-size:clamp(26px,4vw,38px);font-weight:700;letter-spacing:-.025em;background:var(--gradient1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px }
+header .sub { font-size:14px;color:var(--text2) }
+header .badge { display:inline-block;font-size:12px;font-weight:600;letter-spacing:.05em;color:var(--tag-text);background:var(--tag-bg);padding:4px 14px;border-radius:20px;margin-bottom:16px;text-transform:uppercase }
+
+/* ===== Tabs ===== */
+.tabs-nav { display:flex;flex-wrap:wrap;gap:6px;background:var(--input-bg);padding:6px;border-radius:16px;margin-bottom:24px;border:1px solid var(--input-border) }
+.tab-btn { flex:1;min-width:90px;padding:10px 8px;border:none;background:transparent;color:var(--text2);font-size:12px;font-weight:600;border-radius:10px;cursor:pointer;transition:all .2s;outline:none;text-align:center;white-space:nowrap }
+.tab-btn:hover { color:var(--text);background:rgba(255,255,255,0.05) }
+.tab-btn.active { color:#fff;background:var(--accent);box-shadow:0 4px 12px rgba(0,113,227,0.2) }
+html[data-theme="dark"] .tab-btn.active { color:#000;background:var(--text);box-shadow:0 4px 12px rgba(255,255,255,0.1) }
+.tab-panel { display:none;animation:fadeIn .3s cubic-bezier(.22,1,.36,1) forwards }
+.tab-panel.active { display:block }
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeUp { to{opacity:1;transform:translateY(0)} }
+@keyframes slideIn { to{opacity:1;transform:translateX(0)} }
+
+/* ===== Cards ===== */
+.config-card { padding:28px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:20px;box-shadow:var(--card-shadow);margin-bottom:24px }
+.section-title { font-size:18px;font-weight:700;margin-bottom:20px;border-left:4px solid var(--accent);padding-left:10px;line-height:1.2 }
+
+/* ===== Forms ===== */
+.form-group { margin-bottom:22px }
+.form-group label { display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px }
+.form-group.checkbox-row { display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,0.02);padding:14px 16px;border-radius:12px;border:1px solid var(--divider) }
+html[data-theme="dark"] .form-group.checkbox-row { background:rgba(255,255,255,0.02) }
+.form-group.checkbox-row label { margin-bottom:0;padding-right:12px;cursor:pointer }
+.text-input,.select-input { width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:all .25s }
+.text-input:focus,.select-input:focus { border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light) }
+select.select-input { cursor:pointer;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");background-repeat:no-repeat;background-position:right 12px center;background-size:14px;padding-right:36px }
+textarea.textarea-input { width:100%;min-height:120px;padding:12px 14px;border-radius:10px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);font-size:13px;font-family:inherit;line-height:1.5;outline:none;transition:all .25s;resize:vertical }
+textarea.textarea-input:focus { border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light) }
+
+/* ===== Slider ===== */
+.slider-container { display:flex;align-items:center;gap:12px }
+.slider-input { flex:1;height:6px;border-radius:3px;background:var(--input-border);outline:none;appearance:none;cursor:pointer }
+.slider-input::-webkit-slider-thumb { appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 2px 6px rgba(0,0,0,0.15);transition:transform .1s }
+.slider-input::-webkit-slider-thumb:active { transform:scale(1.2) }
+.slider-value { font-size:13px;font-weight:600;min-width:36px;text-align:right;color:var(--accent) }
+
+/* ===== Switch ===== */
+.switch { position:relative;display:inline-block;width:44px;height:24px }
+.switch input { opacity:0;width:0;height:0 }
+.switch-slider { position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:var(--text3);transition:.25s cubic-bezier(0.4,0,0.2,1);border-radius:24px }
+.switch-slider:before { position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background-color:white;transition:.25s cubic-bezier(0.4,0,0.2,1);border-radius:50% }
+input:checked+.switch-slider { background-color:var(--success) }
+input:checked+.switch-slider:before { transform:translateX(20px) }
+
+/* ===== Buttons ===== */
+.btn { padding:11px 24px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;outline:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:100px }
+.btn-secondary { background:var(--input-bg);color:var(--text) }
+.btn-secondary:hover { background:var(--divider) }
+.btn-primary { background:var(--success-bg);color:var(--success) }
+.btn-primary:hover { background:var(--success-hover);transform:translateY(-1px) }
+.btn:disabled { opacity:.4;cursor:not-allowed;transform:none!important }
+.btn-sm { padding:6px 12px;font-size:12px;border-radius:8px;min-width:auto }
+.btn-accent { background:var(--tag-bg);color:var(--tag-text) }
+.btn-accent:hover { background:rgba(0,113,227,0.15);transform:translateY(-1px);min-width:auto }
+.btn-danger { background:var(--danger-bg);color:var(--danger) }
+.btn-danger:hover { background:var(--danger-hover);transform:translateY(-1px);min-width:auto }
+.btn-cancel { background:var(--segment-bg);color:var(--text2);min-width:auto }
+.btn-cancel:hover { background:var(--input-bg);min-width:auto }
+
+/* ===== Hint / List items ===== */
+.hint-text { font-size:11px;color:var(--text2);margin-top:4px;line-height:1.4 }
+.list-container { display:flex;flex-direction:column;gap:12px;margin-top:10px }
+.list-item-card { background:rgba(0,0,0,0.015);border:1px dashed var(--input-border);padding:16px;border-radius:12px;position:relative;animation:fadeIn .2s ease forwards }
+html[data-theme="dark"] .list-item-card { background:rgba(255,255,255,0.01) }
+.list-item-card .remove-btn { position:absolute;top:14px;right:14px;width:26px;height:26px;border-radius:50%;border:none;background:var(--danger-bg);color:var(--danger);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;font-weight:bold }
+.list-item-card .remove-btn:hover { background:var(--danger-hover);transform:scale(1.05) }
+.list-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;padding-right:32px }
+.add-btn { margin-top:8px;padding:10px 16px;border:1px dashed var(--accent);background:transparent;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all .2s }
+.add-btn:hover { background:var(--accent-light) }
+
+/* ===== Footer ===== */
+.footer-bar { position:fixed;bottom:0;left:0;right:0;background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--divider);padding:12px 24px;display:flex;justify-content:center;gap:16px;z-index:100;box-shadow:0 -4px 20px rgba(0,0,0,0.03) }
+
+/* ===== Toast ===== */
+.toast { position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--card-border);border-radius:12px;padding:10px 20px;font-size:13px;font-weight:500;box-shadow:0 8px 30px rgba(0,0,0,0.15);opacity:0;transition:all .3s cubic-bezier(0.22,1,0.36,1);z-index:300;pointer-events:none;text-align:center }
+.toast.show { opacity:1;transform:translateX(-50%) translateY(0) }
+
+/* ===== Token Stats ===== */
+.hero-card { margin:24px 0 32px;padding:40px 32px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:24px;box-shadow:var(--card-shadow);text-align:center;opacity:0;transform:translateY(30px);animation:fadeUp .8s .15s forwards }
+.hero-card .total-number { font-size:clamp(48px,8vw,80px);font-weight:700;letter-spacing:-.03em;line-height:1;background:var(--gradient1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px }
+.hero-card .total-label { font-size:16px;color:var(--text2);font-weight:500;margin-bottom:20px }
+.hero-card .meta-row { display:flex;justify-content:center;gap:32px;flex-wrap:wrap }
+.hero-card .meta-item { text-align:center }
+.hero-card .meta-item .num { font-size:20px;font-weight:600;color:var(--text) }
+.hero-card .meta-item .lb { font-size:13px;color:var(--text2);margin-top:2px }
+.segment-control { display:flex;justify-content:center;gap:4px;background:var(--segment-bg);border-radius:12px;padding:4px;margin:0 0 28px;width:fit-content;margin-left:auto;margin-right:auto;opacity:0;transform:translateY(20px);animation:fadeUp .8s .3s forwards }
+.segment-control .seg { padding:8px 20px;border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:500;border-radius:9px;cursor:pointer;transition:all .3s;font-family:inherit;outline:none }
+.segment-control .seg.active { background:var(--segment-active);color:var(--text);box-shadow:var(--segment-shadow) }
+.segment-control .seg:hover:not(.active) { color:var(--text) }
+.chart-card { padding:28px 24px 20px;margin-bottom:24px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:24px;box-shadow:var(--card-shadow);opacity:0;transform:translateY(30px);transition:opacity .6s,transform .6s }
+.chart-card.visible { opacity:1;transform:translateY(0) }
+.chart-card h2 { font-size:18px;font-weight:600;margin-bottom:12px }
+.chart-wrap { width:100%;overflow-x:auto;position:relative }
+.chart-svg { width:100%;height:auto;display:block }
+.legend { display:flex;flex-wrap:wrap;gap:10px 16px;margin-bottom:14px;padding:10px 14px;background:var(--legend-bg);border-radius:12px }
+.legend-item { display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:opacity .3s;user-select:none }
+.legend-item .dot { width:10px;height:10px;border-radius:50%;flex-shrink:0 }
+.legend-item.hidden { opacity:.3;text-decoration:line-through }
+.tooltip-el { position:absolute;z-index:99;pointer-events:none;background:var(--card);backdrop-filter:blur(24px) saturate(140%);-webkit-backdrop-filter:blur(24px) saturate(140%);border:1px solid var(--card-border);border-radius:14px;box-shadow:var(--card-shadow);padding:12px 16px;opacity:0;transform:translate(-50%,-100%);transition:opacity .15s;white-space:nowrap;top:0;left:0 }
+.tooltip-el.show { opacity:1 }
+.tooltip-el .tt-date { font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;text-align:center;padding-bottom:6px;border-bottom:1px solid var(--divider) }
+.tooltip-el .tt-row { display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px }
+.tooltip-el .tt-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0 }
+.tooltip-el .tt-name { color:var(--text);font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis }
+.tooltip-el .tt-total { color:var(--accent);font-weight:700;margin-left:auto }
+.tooltip-el .tt-detail { color:var(--text2);font-size:11px;margin-left:6px }
+.rank-section { margin-bottom:24px }
+.rank-section h2 { font-size:20px;font-weight:600;margin-bottom:16px }
+.rank-list { display:flex;flex-direction:column;gap:8px }
+.rank-item { display:flex;align-items:center;gap:16px;padding:16px 20px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:16px;box-shadow:var(--card-shadow);transition:all .3s;opacity:0;transform:translateX(-20px);position:relative;overflow:hidden }
+.rank-item:hover { transform:translateX(4px) }
+.rank-item.visible { animation:slideIn .5s forwards }
+.rank-item .rank-num { width:32px;text-align:center;font-size:16px;font-weight:600;flex-shrink:0 }
+.rank-item .rank-num.gold { color:#ff9500 }
+.rank-item .rank-num.silver { color:#aeaeb2 }
+.rank-item .rank-num.bronze { color:#cd7f32 }
+.rank-item .rank-info { flex:1;min-width:0 }
+.rank-item .rank-info .name { font-size:15px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.rank-item .rank-info .detail { font-size:12px;color:var(--text2);margin-top:2px }
+.rank-item .rank-tokens { font-size:16px;font-weight:700;color:var(--accent);flex-shrink:0 }
+.rank-item .rank-bar-bg { position:absolute;bottom:0;left:0;height:3px;background:var(--rank-bg);width:100% }
+.rank-item .rank-bar-fill { position:absolute;bottom:0;left:0;height:3px;background:var(--rank-bar);border-radius:0 2px 2px 0;transition:width 1s cubic-bezier(.22,1,.36,1) }
+
+/* ===== Caption Cache ===== */
+.stat-grid { display:flex;align-items:center;justify-content:center;gap:48px;flex-wrap:wrap;padding:36px 32px;margin:24px 0 28px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:24px;box-shadow:var(--card-shadow) }
+.stat-item { text-align:center }
+.stat-item .num { font-size:clamp(36px,6vw,56px);font-weight:700;letter-spacing:-.03em;line-height:1;background:var(--gradient1);-webkit-background-clip:text;-webkit-text-fill-color:transparent }
+.stat-item .lb { font-size:14px;color:var(--text2);font-weight:500;margin-top:4px }
+.toolbar { display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:24px }
+.toolbar-left { display:flex;gap:10px;flex-wrap:wrap;flex:1 }
+.time-filter { display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2) }
+.time-filter input[type="date"] { padding:6px 10px;border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);font-size:13px;font-family:inherit;outline:none }
+.time-filter input[type="date"]:focus { border-color:var(--accent) }
+.search-box { position:relative;flex:1;min-width:200px;max-width:400px }
+.search-box input { width:100%;padding:9px 36px 9px 34px;border-radius:12px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .25s,box-shadow .25s }
+.search-box input:focus { border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,113,227,0.1) }
+.search-box input::placeholder { color:var(--text3) }
+.search-box .search-icon { position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text3);pointer-events:none }
+.search-box .search-clear { position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:var(--segment-bg);color:var(--text2);width:20px;height:20px;border-radius:50%;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;padding:0 }
+.search-box .search-clear.show { display:flex }
+.cache-list { display:flex;flex-direction:column;gap:10px;margin-bottom:24px }
+.cache-item { display:flex;gap:16px;padding:16px 20px;background:var(--card);backdrop-filter:blur(32px) saturate(140%);-webkit-backdrop-filter:blur(32px) saturate(140%);border:1px solid var(--card-border);border-radius:16px;box-shadow:var(--card-shadow);transition:all .3s;opacity:0;transform:translateX(-20px);align-items:flex-start }
+.cache-item.visible { animation:slideIn .5s forwards }
+.cache-item:hover { transform:translateX(4px) }
+.cache-item.removing { animation:slideOut .35s forwards;pointer-events:none }
+@keyframes slideOut { to { opacity:0;transform:translateX(40px);height:0;padding:0;margin:0;overflow:hidden } }
+.img-preview { width:72px;height:72px;border-radius:10px;flex-shrink:0;overflow:hidden;background:var(--img-placeholder);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:transform .2s }
+.img-preview:hover { transform:scale(1.05) }
+.img-preview img { width:100%;height:100%;object-fit:cover }
+.img-preview .no-img { font-size:28px;opacity:.3;user-select:none }
+.img-preview .no-img-label { position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:8px;color:var(--text3);font-weight:500 }
+.item-content { flex:1;min-width:0;display:flex;flex-direction:column;gap:6px }
+.item-caption { font-size:14px;line-height:1.5;color:var(--text);word-break:break-all;cursor:pointer;padding:4px 8px;border-radius:8px;transition:background .2s;border:1px solid transparent }
+.item-caption:hover { background:var(--input-bg) }
+.item-caption.editing { cursor:text }
+.item-meta { display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text3) }
+.item-meta .hash { font-family:"SF Mono",Menlo,Consolas,monospace;font-size:11px;background:var(--input-bg);padding:2px 6px;border-radius:4px }
+.item-actions { flex-shrink:0;display:flex;gap:6px;align-items:flex-start;padding-top:4px }
+.edit-area { display:flex;flex-direction:column;gap:6px;width:100% }
+.edit-area textarea { width:100%;min-height:60px;padding:8px 10px;border-radius:8px;border:1px solid var(--accent);background:var(--input-bg);color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.5 }
+.edit-actions { display:flex;gap:6px;justify-content:flex-end }
+.load-more { text-align:center;padding:20px 0;opacity:0;transform:translateY(20px) }
+.load-more.visible { animation:fadeUp .5s forwards }
+.empty-state { text-align:center;padding:80px 20px;color:var(--text2);font-size:16px }
+.empty-state .icon { font-size:48px;margin-bottom:16px }
+.empty-state .hint { font-size:14px;color:var(--text3);margin-top:8px }
+.modal-overlay { position:fixed;inset:0;background:var(--overlay);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s;pointer-events:none }
+.modal-overlay.show { opacity:1;pointer-events:auto }
+.modal { background:var(--modal-bg);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--card-border);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,0.2);padding:28px 24px;max-width:400px;width:90%;text-align:center;transform:scale(.9);transition:transform .3s cubic-bezier(.22,1,.36,1) }
+.modal-overlay.show .modal { transform:scale(1) }
+.modal h3 { font-size:18px;font-weight:600;margin-bottom:8px }
+.modal p { font-size:14px;color:var(--text2);margin-bottom:20px;line-height:1.5 }
+.modal-btns { display:flex;gap:10px;justify-content:center }
+.modal-btns .btn { min-width:100px;justify-content:center }
+.lightbox { position:fixed;inset:0;background:var(--overlay);z-index:250;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s;pointer-events:none;cursor:zoom-out }
+.lightbox.show { opacity:1;pointer-events:auto }
+.lightbox img { max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 20px 80px rgba(0,0,0,0.4);transform:scale(.85);transition:transform .3s cubic-bezier(.22,1,.36,1) }
+.lightbox.show img { transform:scale(1) }
+
+@media(max-width:680px) {
+  .container { padding:0 16px }
+  header { padding:40px 0 16px }
+  .hero-card { padding:28px 20px }
+  .hero-card .meta-row { gap:16px }
+  .stat-grid { padding:24px 20px;gap:24px }
+  .segment-control .seg { padding:6px 14px;font-size:13px }
+  .rank-item { padding:12px 16px;gap:12px }
+  .rank-item .rank-tokens { font-size:14px }
+  .toolbar { flex-direction:column;align-items:stretch }
+  .toolbar-left { flex-direction:column }
+  .cache-item { flex-direction:column;gap:10px;padding:14px 16px }
+  .img-preview { width:100%;height:160px;border-radius:12px }
+  .item-actions { align-self:flex-end }
+}
+</style>
+</head>
+<body>
+<div class="bg-glow"></div>
+<div class="container">
+  <header>
+    <h1>主动接话与定制设置</h1>
+    <div class="sub">集中管理主动回复、关键字检测、图片转述、伪人选项和角色人设简化等配置</div>
+  </header>
+
+  <nav class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('persona')">👤 人设定制</button>
+    <button class="tab-btn" onclick="switchTab('general')">⚙️ 基础与触发</button>
+    <button class="tab-btn" onclick="switchTab('reply')">💬 回复与主动</button>
+    <button class="tab-btn" onclick="switchTab('keyword')">🔑 关键词与图片</button>
+    <button class="tab-btn" onclick="switchTab('batch')">⏱️ 延迟与批次</button>
+    <button class="tab-btn" onclick="switchTab('human')">🤖 伪人设置</button>
+    <button class="tab-btn" onclick="switchTab('stats', true)">📊 用量统计</button>
+    <button class="tab-btn" onclick="switchTab('cache', true)">🖼️ 缓存管理</button>
+  </nav>
+
+  <!-- Tab 1: Persona -->
+  <div class="tab-panel active" id="tab-persona">
+    <div class="config-card">
+      <h2 class="section-title">回复分析人设定制</h2>
+      <div class="form-group">
+        <label for="personaSelect">选择人格角色</label>
+        <select class="select-input" id="personaSelect" onchange="onPersonaChange()">
+          <option value="">正在加载人格列表...</option>
+        </select>
+        <div class="hint-text">为特定人格设置简化的专属回复分析提示词，可降低 Context 占用。</div>
+      </div>
+      <div class="form-group">
+        <label for="personaPrompt">专属回复分析人设提示词</label>
+        <textarea class="textarea-input" id="personaPrompt" placeholder="例如：天童爱丽丝，一个可爱的AI机器人，喜欢打游戏，说话带'!'。"></textarea>
+        <div class="hint-text">填写一到两句话的简化版描述。留空则默认降级为该人格的完整系统提示词。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 2: General -->
+  <div class="tab-panel" id="tab-general">
+    <div class="config-card">
+      <h2 class="section-title">基础设置</h2>
+      <div class="form-group">
+        <label for="trigger_mode">触发跟踪模式</label>
+        <select class="select-input" id="trigger_mode">
+          <option value="llm_response">llm_response (仅在LLM回复后开始监听)</option>
+          <option value="any_message">any_message (Bot发出任何消息后都开始监听)</option>
+        </select>
+        <div class="hint-text">选择合适的时候开启检测窗口。</div>
+      </div>
+      <div class="form-group">
+        <label for="filter_prefixes">指令过滤前缀</label>
+        <input type="text" class="text-input" id="filter_prefixes" placeholder="如：/, !, #, $">
+        <div class="hint-text">以这些前缀开头的消息将被静默过滤，不进行任何回复分析。多个前缀用逗号隔开。</div>
+      </div>
+    </div>
+    <div class="config-card">
+      <h2 class="section-title">白名单与概率覆盖配置</h2>
+      <div class="hint-text" style="margin-bottom:12px;">为指定群设置独立的主动或回复接话概率，支持直接填群ID或UMO（如 Bot:GroupMessage:12345）。不在此列表的群组将使用全局默认值。</div>
+      <div class="list-container" id="groups-list"></div>
+      <button class="add-btn" onclick="addGroupItem()">＋ 添加群组覆盖规则</button>
+    </div>
+  </div>
+
+  <!-- Tab 3: Reply & Proactive -->
+  <div class="tab-panel" id="tab-reply">
+    <div class="config-card">
+      <h2 class="section-title">回复模式选项</h2>
+      <div class="form-group">
+        <label for="reply_probability">回复模式 - 分析概率 (%)</label>
+        <div class="slider-container"><input type="range" class="slider-input" id="reply_probability" min="0" max="100" step="5" oninput="updateSliderValue(this)"><span class="slider-value" id="val-reply_probability">0%</span></div>
+        <div class="hint-text">Bot发言后，监听窗口内群友的每条消息有多少概率被分析是否是在跟Bot对话。100代表每条都分析。</div>
+      </div>
+      <div class="form-group">
+        <label for="track_timeout_seconds">跟踪窗口超时时间 (秒)</label>
+        <div class="slider-container"><input type="range" class="slider-input" id="track_timeout_seconds" min="10" max="600" step="10" oninput="updateSliderValue(this)"><span class="slider-value" id="val-track_timeout_seconds">0s</span></div>
+        <div class="hint-text">如果群内一直没有人说话，超过多少秒后自动关闭本次监听窗口。</div>
+      </div>
+      <div class="form-group">
+        <label for="max_detection_count">最大分析消息数 (条)</label>
+        <div class="slider-container"><input type="range" class="slider-input" id="max_detection_count" min="1" max="50" step="1" oninput="updateSliderValue(this)"><span class="slider-value" id="val-max_detection_count">0</span></div>
+        <div class="hint-text">本次监听窗口中，最多对多少条消息进行对话关系分析。</div>
+      </div>
+      <div class="form-group checkbox-row"><label for="enable_llm_tools">启用 LLM 技能 / 工具循环</label><label class="switch"><input type="checkbox" id="enable_llm_tools"><span class="switch-slider"></span></label></div>
+      <div class="form-group"><label for="analyzer_provider_id">分析用 LLM 供应商 (建议使用廉价模型)</label><select class="select-input" id="analyzer_provider_id"></select><div class="hint-text">专门用来做对话相关性分析判断的模型提供商，建议配置性价比高的模型，留空则使用默认。</div></div>
+      <div class="form-group"><label for="generator_provider_id">回复用 LLM 供应商 (建议使用高质量模型)</label><select class="select-input" id="generator_provider_id"></select><div class="hint-text">对话分析通过后，实际用来生成接话内容的模型提供商，留空则使用默认。</div></div>
+      <div class="form-group"><label for="analyzer_system_prompt">【回复分析】LLM 判断系统提示词</label><textarea class="textarea-input" id="analyzer_system_prompt"></textarea><div class="hint-text">必须返回标准的 JSON 格式：{"is_reply_to_bot": "yes|no", "reason": "..."}</div></div>
+    </div>
+    <div class="config-card">
+      <h2 class="section-title">主动模式选项</h2>
+      <div class="form-group">
+        <label for="active_probability">主动模式 - 参与概率 (%)</label>
+        <div class="slider-container"><input type="range" class="slider-input" id="active_probability" min="0" max="100" step="5" oninput="updateSliderValue(this)"><span class="slider-value" id="val-active_probability">0%</span></div>
+        <div class="hint-text">Bot未被唤醒也未发言时，随机收到群友消息时，按此概率决定是否分析话题并主动插话。0表示彻底关闭主动模式。</div>
+      </div>
+      <div class="form-group">
+        <label for="max_proactive_rounds">最大主动参与轮数</label>
+        <div class="slider-container"><input type="range" class="slider-input" id="max_proactive_rounds" min="0" max="10" step="1" oninput="updateSliderValue(this)"><span class="slider-value" id="val-max_proactive_rounds">0</span></div>
+        <div class="hint-text">本轮Bot主动插话的最大次数，防止刷屏。0代表不限制。</div>
+      </div>
+      <div class="form-group">
+        <label for="proactive_cooldown_seconds">主动插话冷却时间 (秒)</label>
+        <div class="slider-container"><input type="range" class="slider-input" id="proactive_cooldown_seconds" min="30" max="3600" step="30" oninput="updateSliderValue(this)"><span class="slider-value" id="val-proactive_cooldown_seconds">0s</span></div>
+        <div class="hint-text">触发主动接话后，该群需要等待多久才能进行下一次的主动插话分析。</div>
+      </div>
+      <div class="form-group"><label for="proactive_analyzer_system_prompt">【主动分析】LLM 系统提示词</label><textarea class="textarea-input" id="proactive_analyzer_system_prompt"></textarea><div class="hint-text">必须返回标准的 JSON 格式：{"should_join": "yes|no", "reason": "..."}</div></div>
+    </div>
+  </div>
+
+  <!-- Tab 4: Keywords & Image Caption -->
+  <div class="tab-panel" id="tab-keyword">
+    <div class="config-card">
+      <h2 class="section-title">兴趣关键词模式</h2>
+      <div class="form-group checkbox-row"><label for="enable_keyword_trigger">启用关键词监听模式</label><label class="switch"><input type="checkbox" id="enable_keyword_trigger"><span class="switch-slider"></span></label></div>
+      <div class="form-group"><label for="keyword_default_probability">关键词默认触发概率 (%)</label><div class="slider-container"><input type="range" class="slider-input" id="keyword_default_probability" min="0" max="100" step="5" oninput="updateSliderValue(this)"><span class="slider-value" id="val-keyword_default_probability">0%</span></div><div class="hint-text">当匹配到关键词且规则中未指定具体概率时，使用的默认触发回复概率。</div></div>
+      <div class="form-group checkbox-row"><label for="enable_keyword_on_image">启用关键词匹配图片转述文本</label><label class="switch"><input type="checkbox" id="enable_keyword_on_image"><span class="switch-slider"></span></label></div>
+    </div>
+    <div class="config-card">
+      <h2 class="section-title">兴趣关键词匹配规则</h2>
+      <div class="list-container" id="keywords-list"></div>
+      <button class="add-btn" onclick="addKeywordItem()">＋ 添加关键词规则</button>
+    </div>
+    <div class="config-card">
+      <h2 class="section-title">图片转述设置 (Captioning)</h2>
+      <div class="form-group checkbox-row"><label for="enable_image_caption">启用图片转述 (对于非多模态模型建议开启)</label><label class="switch"><input type="checkbox" id="enable_image_caption"><span class="switch-slider"></span></label></div>
+      <div class="form-group"><label for="image_caption_probability">即时转述匹配概率 (%)</label><div class="slider-container"><input type="range" class="slider-input" id="image_caption_probability" min="0" max="100" step="5" oninput="updateSliderValue(this)"><span class="slider-value" id="val-image_caption_probability">0%</span></div><div class="hint-text">在图片缓存未命中时，对新图片进行即时描述的触发概率。若准备回复构建上下文时，则强制进行100%描述。</div></div>
+      <div class="form-group"><label for="image_caption_provider_id">图片转述 LLM 供应商</label><select class="select-input" id="image_caption_provider_id"></select><div class="hint-text">用于执行图片转述的多模态提供商实例，留空使用全局或会话默认设置。</div></div>
+    </div>
+  </div>
+
+  <!-- Tab 5: Batch -->
+  <div class="tab-panel" id="tab-batch">
+    <div class="config-card">
+      <h2 class="section-title">批次消息分析 (延迟回复)</h2>
+      <div class="form-group checkbox-row"><label for="batch_analysis_enabled">启用延迟批次分析 (等群聊停顿后再批量处理)</label><label class="switch"><input type="checkbox" id="batch_analysis_enabled"><span class="switch-slider"></span></label></div>
+      <div class="form-group"><label for="silence_multiplier">静默判定倍数</label><div class="slider-container"><input type="range" class="slider-input" id="silence_multiplier" min="1.5" max="5.0" step="0.5" oninput="updateSliderValue(this,true)"><span class="slider-value" id="val-silence_multiplier">0</span></div><div class="hint-text">实际停顿判定时间 = clamp(消息平均间隔 × 倍数, 最小秒数, 最大秒数)。倍数越大判定条件越宽松，等待时间越长。</div></div>
+      <div class="form-group"><label for="min_silence_seconds">最小静默秒数</label><div class="slider-container"><input type="range" class="slider-input" id="min_silence_seconds" min="2" max="10" step="1" oninput="updateSliderValue(this)"><span class="slider-value" id="val-min_silence_seconds">0s</span></div><div class="hint-text">无论群聊节奏多快，必须在最后一条消息后静默达到多少秒，才开始触发分析（防止抢话）。</div></div>
+      <div class="form-group"><label for="max_silence_seconds">最大静默秒数</label><div class="slider-container"><input type="range" class="slider-input" id="max_silence_seconds" min="5" max="30" step="1" oninput="updateSliderValue(this)"><span class="slider-value" id="val-max_silence_seconds">0s</span></div><div class="hint-text">无论群友打字多慢，消息停顿超过此秒数立刻视为这波发言结束并触发分析。</div></div>
+      <div class="form-group"><label for="max_batch_wait_seconds">绝对超时秒数 (首消息开始算)</label><div class="slider-container"><input type="range" class="slider-input" id="max_batch_wait_seconds" min="5" max="60" step="5" oninput="updateSliderValue(this)"><span class="slider-value" id="val-max_batch_wait_seconds">0s</span></div><div class="hint-text">从批次中第一条消息开始等待的绝对超时上限，即使群聊一直疯狂刷屏，到时间也会强制分析，防止无限期拖延。</div></div>
+      <div class="form-group"><label for="max_batch_messages">最大消息积攒数 (条)</label><div class="slider-container"><input type="range" class="slider-input" id="max_batch_messages" min="2" max="20" step="1" oninput="updateSliderValue(this)"><span class="slider-value" id="val-max_batch_messages">0</span></div><div class="hint-text">积攒的消息达到此数量时，无视静默和间隔逻辑直接触发分析，防止上下文过载。</div></div>
+      <div class="form-group checkbox-row"><label for="instant_at_bot">@ 提到 Bot 时立即中断等待并触发分析</label><label class="switch"><input type="checkbox" id="instant_at_bot"><span class="switch-slider"></span></label></div>
+      <div class="form-group"><label for="caption_timeout_seconds">图片转述最长等待超时 (秒)</label><div class="slider-container"><input type="range" class="slider-input" id="caption_timeout_seconds" min="5" max="30" step="5" oninput="updateSliderValue(this)"><span class="slider-value" id="val-caption_timeout_seconds">0s</span></div></div>
+      <div class="form-group"><label for="caption_timeout_behavior">图片转述超时处理策略</label><select class="select-input" id="caption_timeout_behavior"><option value="wait_then_fallback">wait_then_fallback (等待转述完成，超时用占位符)</option><option value="skip_use_url">skip_use_url (不等待直接传图片URL，非多模态降级)</option><option value="skip_use_placeholder">skip_use_placeholder (不等待直接使用占位符)</option></select></div>
+    </div>
+  </div>
+
+  <!-- Tab 6: Human-like -->
+  <div class="tab-panel" id="tab-human">
+    <div class="config-card">
+      <h2 class="section-title">伪人模式 (自主决定活跃状态)</h2>
+      <div class="form-group checkbox-row"><label for="human_like_mode">启用伪人模式 (自主规划工作/睡觉状态)</label><label class="switch"><input type="checkbox" id="human_like_mode"><span class="switch-slider"></span></label></div>
+      <div class="form-group"><label for="wake_at_threshold">唤醒所需 @ 累计次数</label><div class="slider-container"><input type="range" class="slider-input" id="wake_at_threshold" min="1" max="10" step="1" oninput="updateSliderValue(this)"><span class="slider-value" id="val-wake_at_threshold">0</span></div><div class="hint-text">Bot睡觉状态下，被不同群友连续@累计达到多少次后，强制将状态改为清醒并回复。</div></div>
+      <div class="form-group"><label for="wake_window_minutes">@ 计数有效窗口 (分钟)</label><div class="slider-container"><input type="range" class="slider-input" id="wake_window_minutes" min="5" max="120" step="5" oninput="updateSliderValue(this)"><span class="slider-value" id="val-wake_window_minutes">0m</span></div><div class="hint-text">累计@次数的滑动窗口有效时间，过期的@记录会被废弃重新计算。</div></div>
+      <div class="form-group"><label for="typing_delay_min">发言打字随机延迟下限 (秒)</label><div class="slider-container"><input type="range" class="slider-input" id="typing_delay_min" min="0" max="10" step="0.5" oninput="updateSliderValue(this,false,'s')"><span class="slider-value" id="val-typing_delay_min">0s</span></div></div>
+      <div class="form-group"><label for="typing_delay_max">发言打字随机延迟上限 (秒)</label><div class="slider-container"><input type="range" class="slider-input" id="typing_delay_max" min="0" max="10" step="0.5" oninput="updateSliderValue(this,false,'s')"><span class="slider-value" id="val-typing_delay_max">0s</span></div><div class="hint-text">伪人模式开启后，在此延迟范围内随机等待后再将消息发出，模拟真人在编辑消息。</div></div>
+    </div>
+  </div>
+
+  <!-- Tab 7: Token Stats -->
+  <div class="tab-panel" id="tab-stats">
+    <div class="hero-card">
+      <div class="total-number" id="totalNum">—</div><div class="total-label">Total Tokens</div>
+      <div class="meta-row">
+        <div class="meta-item"><div class="num" id="promptTotal">—</div><div class="lb">Prompt</div></div>
+        <div class="meta-item"><div class="num" id="compTotal">—</div><div class="lb">Completion</div></div>
+        <div class="meta-item"><div class="num" id="groupCount">—</div><div class="lb">活跃群组</div></div>
+      </div>
+    </div>
+    <div class="segment-control">
+      <button class="seg" data-period="day">今日</button>
+      <button class="seg" data-period="yesterday">昨日</button>
+      <button class="seg" data-period="week">本周</button>
+      <button class="seg active" data-period="month">本月</button>
+      <button class="seg" data-period="year">近一年</button>
+    </div>
+    <div class="chart-card" id="chartCard">
+      <h2>每日 Token 趋势（分群）</h2>
+      <div class="legend" id="legend"></div>
+      <div class="chart-wrap"><svg class="chart-svg" id="chart" viewBox="0 0 1000 320"></svg><div class="tooltip-el" id="tooltip"></div></div>
+    </div>
+    <div class="rank-section"><h2>群组 Token 排行</h2><div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:12px;padding:6px 12px;background:var(--legend-bg);border-radius:8px">💡 群名会在插件触发 LLM 调用后自动显示</div><div class="rank-list" id="rankList"></div></div>
+  </div>
+
+  <!-- Tab 8: Caption Cache -->
+  <div class="tab-panel" id="tab-cache">
+    <div class="stat-grid">
+      <div class="stat-item"><div class="num" id="statCount">—</div><div class="lb">缓存条数</div></div>
+      <div class="stat-item"><div class="num" id="statSize">—</div><div class="lb">数据库大小</div></div>
+    </div>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button class="btn btn-danger btn-sm" id="btnClearAll" onclick="confirmClearAll()">🗑️ 一键清空</button>
+        <div class="time-filter">
+          <span>清理</span>
+          <input type="date" id="dateBefore">
+          <span>之前的缓存</span>
+          <button class="btn btn-accent btn-sm" id="btnClearBefore" onclick="confirmClearBefore()">清理</button>
+        </div>
+      </div>
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="搜索转述内容…">
+        <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+      </div>
+    </div>
+    <div class="cache-list" id="cacheList"></div>
+    <div class="load-more" id="loadMore">
+      <button class="btn btn-accent" id="btnLoadMore" onclick="loadMore()">加载更多</button>
+    </div>
+    <div class="empty-state" id="cacheEmpty" style="display:none"><div class="icon">📭</div><div>暂无缓存数据</div><div class="hint">当图片转述功能触发后，缓存将自动生成</div></div>
+  </div>
+</div>
+
+<footer class="footer-bar">
+  <button class="btn btn-secondary" onclick="loadData()">🔄 放弃更改</button>
+  <button class="btn btn-primary" id="btnSave" onclick="saveAll()">💾 保存并生效</button>
+</footer>
+
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h3 id="modalTitle">确认操作</h3>
+    <p id="modalDesc">确定要执行此操作吗？</p>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" id="modalConfirmBtn" onclick="modalConfirm()">确认</button>
+    </div>
+  </div>
+</div>
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" alt="preview">
+</div>
+
+<script type="module">
+const B = window.AstrBotPluginPage;
+if (!B) {
+  document.body.innerHTML = '<div class="container"><div class="empty-state" style="text-align:center;padding:80px 20px;color:var(--text2);font-size:16px;"><div>⚠️</div><div style="margin-top:16px;">Bridge not available</div></div></div>';
+} else {
+  await B.ready();
+  (function(){const m=window.matchMedia('(prefers-color-scheme:dark)');function s(d){document.documentElement.setAttribute('data-theme',d?'dark':'light')}s(m.matches);m.addEventListener('change',e=>s(e.matches))})();
+
+  // ===== ADMIN: Config Management =====
+  const personaSelect=document.getElementById('personaSelect');
+  const personaPrompt=document.getElementById('personaPrompt');
+  const toast=document.getElementById('toast');
+  const btnSave=document.getElementById('btnSave');
+  let config={},personas=[],personaPrompts=[],providers=[],currentPersonaName='',toastTimer=null;
+
+  window.showToast=function(msg,dur=2500){toast.textContent=msg;toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),dur)};
+
+  // Init panels that were inited
+  let statsPanelInited=false,cachePanelInited=false;
+
+  window.switchTab=function(tabName,isLazy=false){
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    const btn=Array.from(document.querySelectorAll('.tab-btn')).find(b=>b.getAttribute('onclick').includes("'"+tabName+"'"));
+    if(btn)btn.classList.add('active');
+    const panel=document.getElementById(`tab-${tabName}`);
+    if(panel)panel.classList.add('active');
+    if(isLazy&&tabName==='stats'&&!statsPanelInited){statsPanelInited=true;initTokenStats()}
+    if(isLazy&&tabName==='cache'&&!cachePanelInited){cachePanelInited=true;initCaptionCache()}
+  };
+
+  window.updateSliderValue=function(el,isFloat=false,unit=''){
+    const id='val-'+el.id,ind=document.getElementById(id);
+    if(!ind)return;
+    let v=el.value;
+    if(el.id.includes('probability'))ind.textContent=v+'%';
+    else if(el.id.includes('seconds')||el.id.includes('delay'))ind.textContent=v+'s';
+    else if(el.id.includes('minutes'))ind.textContent=v+'m';
+    else ind.textContent=v+unit;
+  };
+
+  function initSliders(){document.querySelectorAll('.slider-input').forEach(s=>updateSliderValue(s))}
+
+  // Group whitelist
+  window.addGroupItem=function(data={group_id:'',reply_probability:null,active_probability:null}){
+    const list=document.getElementById('groups-list'),card=document.createElement('div');
+    card.className='list-item-card';
+    card.innerHTML=`<button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+      <div class="list-grid">
+        <div class="form-group"><label>群号 / UMO</label><input type="text" class="text-input group-id" value="${data.group_id||''}" placeholder="例如 12345678"></div>
+        <div class="form-group"><label>独立回复概率 (%) (留空使用全局)</label><input type="number" class="text-input group-reply" value="${data.reply_probability!==null&&data.reply_probability!==undefined?data.reply_probability:''}" placeholder="全局/默认" min="0" max="100"></div>
+        <div class="form-group"><label>独立主动概率 (%) (留空使用全局)</label><input type="number" class="text-input group-active" value="${data.active_probability!==null&&data.active_probability!==undefined?data.active_probability:''}" placeholder="全局/默认" min="0" max="100"></div>
+      </div>`;
+    list.appendChild(card);
+  };
+
+  // Keyword rules
+  window.addKeywordItem=function(data={groups:'',keywords:'',probability:null}){
+    const list=document.getElementById('keywords-list'),card=document.createElement('div');
+    card.className='list-item-card';
+    card.innerHTML=`<button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+      <div class="list-grid">
+        <div class="form-group" style="grid-column:span 2"><label>匹配关键字 (用英文/中文逗号分隔)</label><input type="text" class="text-input kw-keywords" value="${data.keywords||''}" placeholder="例如: 原神,星铁"></div>
+        <div class="form-group"><label>生效群聊 (留空为全部群)</label><input type="text" class="text-input kw-groups" value="${data.groups||''}" placeholder="群ID,多个用逗号隔开"></div>
+        <div class="form-group"><label>独立触发概率 (%) (留空默认)</label><input type="number" class="text-input kw-probability" value="${data.probability!==null&&data.probability!==undefined?data.probability:''}" placeholder="默认" min="0" max="100"></div>
+      </div>`;
+    list.appendChild(card);
+  };
+
+  function populateProviders(sid,cur){const s=document.getElementById(sid);s.innerHTML='<option value="">使用会话默认 / 留空</option>';providers.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;if(p.id===cur)o.selected=true;s.appendChild(o)})}
+  function parseResponse(r){return r&&r.status==='ok'&&r.data!==undefined?r.data:r}
+
+  window.loadData=async function(){
+    btnSave.disabled=true;
+    try{
+      const[pr,pm,cr,provRes]=await Promise.all([B.apiGet('personas'),B.apiGet('persona_prompts'),B.apiGet('config'),B.apiGet('providers')]);
+      personas=parseResponse(pr)||[];personaPrompts=parseResponse(pm)||[];config=parseResponse(cr)||{};providers=parseResponse(provRes)||[];
+      personaSelect.innerHTML='';if(personas.length===0){personaSelect.innerHTML='<option value="">未找到系统人格角色</option>'}else{personas.forEach(p=>{const o=document.createElement('option');o.value=p.id||p.name;o.textContent=`${p.name} (${p.id})`;personaSelect.appendChild(o)});onPersonaChange()}
+      populateProviders('analyzer_provider_id',config.analyzer_provider_id);populateProviders('generator_provider_id',config.generator_provider_id);populateProviders('image_caption_provider_id',config.image_caption_provider_id);
+      document.getElementById('trigger_mode').value=config.trigger_mode||'llm_response';
+      document.getElementById('filter_prefixes').value=(config.filter_prefixes||[]).join(', ');
+      ['reply_probability','track_timeout_seconds','max_detection_count','active_probability','max_proactive_rounds','proactive_cooldown_seconds','keyword_default_probability','image_caption_probability','silence_multiplier','min_silence_seconds','max_silence_seconds','max_batch_wait_seconds','max_batch_messages','caption_timeout_seconds','wake_at_threshold','wake_window_minutes','typing_delay_min','typing_delay_max'].forEach(k=>{const el=document.getElementById(k);if(el&&config[k]!==undefined)el.value=config[k]});
+      ['enable_llm_tools','enable_keyword_trigger','enable_keyword_on_image','enable_image_caption','batch_analysis_enabled','instant_at_bot','human_like_mode'].forEach(k=>{const el=document.getElementById(k);if(el&&config[k]!==undefined)el.checked=!!config[k]});
+      document.getElementById('caption_timeout_behavior').value=config.caption_timeout_behavior||'wait_then_fallback';
+      document.getElementById('analyzer_system_prompt').value=config.analyzer_system_prompt||'';
+      document.getElementById('proactive_analyzer_system_prompt').value=config.proactive_analyzer_system_prompt||'';
+      document.getElementById('groups-list').innerHTML='';(config.enabled_groups||[]).forEach(g=>addGroupItem(g));
+      document.getElementById('keywords-list').innerHTML='';(config.keyword_rules||[]).forEach(k=>addKeywordItem(k));
+      initSliders();btnSave.disabled=false;showToast('配置数据加载成功')
+    }catch(e){console.error(e);showToast('数据获取失败: '+e.message)}
+  };
+
+  window.onPersonaChange=function(){const v=personaSelect.value;currentPersonaName=v;if(!v){personaPrompt.value='';return}const f=personaPrompts.find(i=>i.persona_name.toLowerCase()===v.toLowerCase());personaPrompt.value=f?(f.custom_persona_prompt||''):''};
+
+  function getGroupWhitelistData(){const list=[];document.querySelectorAll('#groups-list .list-item-card').forEach(c=>{const gid=c.querySelector('.group-id').value.trim();if(!gid)return;const rp=c.querySelector('.group-reply').value,ap=c.querySelector('.group-active').value;list.push({group_id:gid,reply_probability:rp===''?null:parseInt(rp),active_probability:ap===''?null:parseInt(ap),__template_key:"group_template"})});return list}
+  function getKeywordRulesData(){const list=[];document.querySelectorAll('#keywords-list .list-item-card').forEach(c=>{const kw=c.querySelector('.kw-keywords').value.trim();if(!kw)return;const g=c.querySelector('.kw-groups').value.trim(),p=c.querySelector('.kw-probability').value;list.push({groups:g,keywords:kw,probability:p===''?null:parseInt(p),__template_key:"keyword_template"})});return list}
+
+  window.saveAll=async function(){
+    btnSave.disabled=true;btnSave.textContent='保存中...';
+    try{
+      const u={...config};
+      u.trigger_mode=document.getElementById('trigger_mode').value;
+      u.filter_prefixes=document.getElementById('filter_prefixes').value.split(',').map(s=>s.trim()).filter(Boolean);
+      u.analyzer_provider_id=document.getElementById('analyzer_provider_id').value;
+      u.generator_provider_id=document.getElementById('generator_provider_id').value;
+      u.image_caption_provider_id=document.getElementById('image_caption_provider_id').value;
+      u.caption_timeout_behavior=document.getElementById('caption_timeout_behavior').value;
+      u.analyzer_system_prompt=document.getElementById('analyzer_system_prompt').value;
+      u.proactive_analyzer_system_prompt=document.getElementById('proactive_analyzer_system_prompt').value;
+      ['reply_probability','track_timeout_seconds','max_detection_count','active_probability','max_proactive_rounds','proactive_cooldown_seconds','keyword_default_probability','image_caption_probability','min_silence_seconds','max_silence_seconds','max_batch_wait_seconds','max_batch_messages','caption_timeout_seconds','wake_at_threshold','wake_window_minutes'].forEach(k=>{u[k]=parseInt(document.getElementById(k).value)});
+      ['silence_multiplier','typing_delay_min','typing_delay_max'].forEach(k=>{u[k]=parseFloat(document.getElementById(k).value)});
+      ['enable_llm_tools','enable_keyword_trigger','enable_keyword_on_image','enable_image_caption','batch_analysis_enabled','instant_at_bot','human_like_mode'].forEach(k=>{u[k]=document.getElementById(k).checked});
+      u.enabled_groups=getGroupWhitelistData();u.keyword_rules=getKeywordRulesData();
+      if(currentPersonaName){const cv=personaPrompt.value,pr=await B.apiPost('persona_prompts',{persona_name:currentPersonaName,custom_persona_prompt:cv});if(!pr||pr.status!=='ok')throw new Error('更新人设提示词失败: '+(pr?.message||'未知错误'));const idx=personaPrompts.findIndex(i=>i.persona_name.toLowerCase()===currentPersonaName.toLowerCase());if(idx!==-1){if(cv.trim()==='')personaPrompts.splice(idx,1);else personaPrompts[idx].custom_persona_prompt=cv}else if(cv.trim()!==''){personaPrompts.push({persona_name:currentPersonaName,custom_persona_prompt:cv})}}
+      const rc=await B.apiPost('config',u);
+      if(rc&&rc.status==='ok'){config=u;showToast('全部配置已成功保存并生效！')}else {throw new Error(rc?.message||'保存配置失败')}
+    }catch(e){console.error(e);showToast('保存错误: '+e.message)}finally{btnSave.disabled=false;btnSave.textContent='💾 保存并生效'}
+  };
+
+  // ===== TOKEN STATS =====
+  function initTokenStats(){
+    const PALETTE=['#0071e3','#ff2d55','#34c759','#ff9500','#5856d6','#ff6482','#00c7be','#af52de','#ffd60a','#30b0c7','#ff9f0a','#bf5af2','#64d2ff','#ff453a','#32d74b'];
+    const s=s=>document.querySelector(s);
+    const stats_totalNum=s('#totalNum'),stats_prompt=s('#promptTotal'),stats_comp=s('#compTotal'),stats_groupCnt=s('#groupCount'),stats_chart=s('#chart'),stats_legend=s('#legend'),stats_rankList=s('#rankList'),stats_tooltip=s('#tooltip'),stats_segs=document.querySelectorAll('#tab-stats .seg');
+    let stats_curPeriod='month';
+    const stats_hiddenSet=new Set();
+    const PERIOD_DAYS={day:7,yesterday:7,week:7,month:31,year:365};
+    function fmt(n){if(n==null)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e4)return(n/1e4).toFixed(1)+'万';return n.toLocaleString()}
+    function fmtFull(n){if(n==null)return'0';return n.toLocaleString()}
+    let chartDates=[],chartMeta={};
+
+    function drawChart(allGroups){
+      if(!allGroups||!allGroups.length){stats_chart.innerHTML='<text x="500" y="165" text-anchor="middle" fill="var(--text3)" font-size="14">暂无数据</text>';stats_legend.innerHTML='';chartDates=[];return}
+      const W=1000,H=320,pad={top:16,right:16,bottom:36,left:52},cw=W-pad.left-pad.right,ch=H-pad.top-pad.bottom;
+      let maxVal=0;const dateSet=new Set(),vis=allGroups.filter(g=>!stats_hiddenSet.has(g.group_id));
+      allGroups.forEach(g=>{g.daily.forEach(d=>{dateSet.add(d.date);if(!stats_hiddenSet.has(g.group_id)&&d.total>maxVal)maxVal=d.total})});
+      maxVal=Math.max(maxVal,1);let niceMax=Math.pow(10,Math.ceil(Math.log10(maxVal)));if(maxVal<=niceMax/2)niceMax/=2;
+      const dates=[...dateSet].sort(),yTicks=4;chartDates=dates;
+      const dm={};allGroups.forEach(g=>{g.daily.forEach(d=>{if(!dm[d.date])dm[d.date]={};dm[d.date][g.group_id]={name:g.group_name||g.group_id,total:d.total,prompt:d.prompt,completion:d.completion,color:PALETTE[allGroups.indexOf(g)%PALETTE.length]}})});
+      chartMeta={dm,pad,cw,ch,H,niceMax};
+      let svg='<defs>';
+      vis.forEach((g,i)=>{const c=PALETTE[i%PALETTE.length];svg+=`<linearGradient id="a${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${c}" stop-opacity="0.2"/><stop offset="100%" stop-color="${c}" stop-opacity="0.01"/></linearGradient>`});svg+='</defs>';
+      const tc=getComputedStyle(document.documentElement).getPropertyValue('--text3').trim()||'#86868b';
+      for(let i=0;i<=yTicks;i++){const v=(niceMax/yTicks)*i,y=pad.top+ch-(v/niceMax)*ch;svg+=`<line x1="${pad.left}" y1="${y}" x2="${pad.left+cw}" y2="${y}" stroke="var(--divider)" stroke-width="0.5"/><text x="${pad.left-8}" y="${y+4}" text-anchor="end" fill="${tc}" font-size="11">${fmt(v)}</text>`}
+      const n=dates.length;if(n>1){const cnt=Math.min(6,n),step=Math.max(1,Math.floor(n/(cnt-1)));for(let i=0;i<n;i+=step){const d=dates[i],x=pad.left+i*cw/(n-1),p=d.split('-');svg+=`<text x="${x}" y="${H-6}" text-anchor="middle" fill="${tc}" font-size="10">${p.slice(1).join('/')}</text>`}}
+      vis.forEach((g,gi)=>{const c=PALETTE[gi%PALETTE.length],pts=g.daily.filter(d=>dates.includes(d.date)).sort((a,b)=>a.date.localeCompare(b.date));if(!pts.length)return;let pd='',fd='';pts.forEach((p,i)=>{const di=dates.indexOf(p.date),x=pad.left+(n>1?di*cw/(n-1):cw/2),y=pad.top+ch-(p.total/niceMax)*ch;if(i===0){pd+=`M ${x} ${y}`;fd=`M ${x} ${pad.top+ch}`}else{const px=pad.left+(n>1?dates.indexOf(pts[i-1].date)*cw/(n-1):0),py=pad.top+ch-(pts[i-1].total/niceMax)*ch;pd+=` C ${px+(x-px)*0.4} ${py}, ${x-(x-px)*0.4} ${y}, ${x} ${y}`}});const lx=pad.left+(n>1?dates.indexOf(pts[pts.length-1].date)*cw/(n-1):cw/2),ly=pad.top+ch-(pts[pts.length-1].total/niceMax)*ch;fd+=` L ${lx} ${ly} L ${lx} ${pad.top+ch} Z`;svg+=`<path d="${fd}" fill="url(#a${gi})" opacity="0.7"/><path d="${pd}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`});
+      svg+=`<line id="vline" y1="${pad.top}" y2="${pad.top+ch}" stroke="var(--text3)" stroke-width="1" stroke-dasharray="4,4" style="display:none"/><rect id="hoverZone" x="${pad.left}" y="${pad.top}" width="${cw}" height="${ch}" fill="transparent" pointer-events="all"/>`;
+      stats_chart.innerHTML=svg;
+      let lh='';allGroups.forEach((g,i)=>{const c=PALETTE[i%PALETTE.length],h=stats_hiddenSet.has(g.group_id)?'hidden':'';const gn=g.group_name||g.group_id;lh+=`<div class="legend-item ${h}" data-gid="${g.group_id}"><span class="dot" style="background:${c}"></span>${gn} - ${g.group_id}</div>`});stats_legend.innerHTML=lh;
+      stats_legend.querySelectorAll('.legend-item').forEach(el=>{el.addEventListener('click',()=>{const id=el.dataset.gid;stats_hiddenSet.has(id)?stats_hiddenSet.delete(id):stats_hiddenSet.add(id);drawChart(allGroups)})});
+      if(stats_chart){stats_chart.addEventListener('mousemove',e=>{const m=chartDates;if(!m.length)return;const rect=stats_chart.getBoundingClientRect();const svgX=(e.clientX-rect.left)/rect.width*1000;const n=m.length,padV=52,cwV=932;let idx=Math.round((svgX-padV)/(n>1?cwV/(n-1):1));idx=Math.max(0,Math.min(n-1,idx));const date=m[idx],dmp=chartMeta.dm[date]||{};const groups=Object.values(dmp).sort((a,b)=>b.total-a.total);if(groups.length){let h=`<div class="tt-date">${date.slice(5)}</div>`;groups.forEach(g=>{h+=`<div class="tt-row"><span class="tt-dot" style="background:${g.color}"></span><span class="tt-name">${g.name}</span><span class="tt-total">${fmt(g.total)}</span><span class="tt-detail">P:${fmt(g.prompt)} C:${fmt(g.completion)}</span></div>`});stats_tooltip.innerHTML=h;stats_tooltip.classList.add('show');const r2=stats_chart.getBoundingClientRect();const tx=(e.clientX-r2.left);const ty=(e.clientY-r2.top);stats_tooltip.style.left=tx+'px';stats_tooltip.style.top=ty+'px'}const vline=stats_chart.getElementById('vline');if(vline){const x=padV+(n>1?idx*cwV/(n-1):cwV/2);vline.setAttribute('x1',x);vline.setAttribute('x2',x);vline.style.display=''}});
+      stats_chart.addEventListener('mouseleave',()=>{stats_tooltip.classList.remove('show');const vline=stats_chart.getElementById('vline');if(vline)vline.style.display='none'})}
+    }
+
+    function renderRank(groups){if(!groups||!groups.length){stats_rankList.innerHTML='<div class="empty-state"><div class="icon">📋</div><div>暂无数据</div><div class="hint">等待 LLM 调用产生数据后自动显示</div></div>';return}const mv=groups[0].total||1;let h='';groups.forEach((g,i)=>{const p=mv>0?g.total/mv*100:0;const rn=g.group_name?`${g.group_name} - ${g.group_id}`:(g.group_id||'未知群组');h+=`<div class="rank-item" style="animation-delay:${i*0.05}s"><div class="rank-num ${i<3?['gold','silver','bronze'][i]:''}">${i<3?['🥇','🥈','🥉'][i]:'#'+(i+1)}</div><div class="rank-info"><div class="name">${rn}</div><div class="detail">Prompt ${fmt(g.prompt)} · Completion ${fmt(g.completion)}</div></div><div class="rank-tokens">${fmt(g.total)}</div><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:0%"></div></div></div>`});stats_rankList.innerHTML=h;requestAnimationFrame(()=>{document.querySelectorAll('#tab-stats .rank-item').forEach((el,i)=>{el.classList.add('visible');const bar=el.querySelector('.rank-bar-fill'),pct=groups[i]?groups[i].total/mv*100:0;setTimeout(()=>{bar.style.width=pct+'%'},100+i*50)})})}
+
+    async function updateStats(p){stats_curPeriod=p;stats_segs.forEach(s=>s.classList.toggle('active',s.dataset.period===p));stats_chart.style.opacity='0';stats_chart.style.transition='opacity .2s';
+      try{const sr=await B.apiGet('token_stats',{period:p}),sd=sr&&sr.data?sr.data:sr;if(!sd)throw'No data';const g=sd.global||{},gr=sd.groups||[];stats_totalNum.textContent=fmtFull(g.total||0);stats_prompt.textContent=fmtFull(g.prompt||0);stats_comp.textContent=fmtFull(g.completion||0);stats_groupCnt.textContent=g.group_count||0;
+      const days=PERIOD_DAYS[p]||30;const hr=await B.apiGet('token_history',{days}),hd=hr&&hr.data?hr.data:hr;drawChart((hd&&hd.groups)||[]);requestAnimationFrame(()=>requestAnimationFrame(()=>{stats_chart.style.opacity='1'}));renderRank(gr)}
+      catch(e){stats_totalNum.textContent='—';stats_prompt.textContent='—';stats_comp.textContent='—';stats_groupCnt.textContent='—';stats_chart.innerHTML='<text x="500" y="165" text-anchor="middle" fill="var(--text3)" font-size="14">加载失败</text>';stats_chart.style.opacity='1'}}
+    stats_segs.forEach(s=>s.addEventListener('click',()=>updateStats(s.dataset.period)));
+    updateStats(stats_curPeriod);
+  }
+
+  // ===== CAPTION CACHE =====
+  function initCaptionCache(){
+    const PAGE_SIZE=20;let allItems=[],cc_offset=0,cc_total=0,cc_pending=null,cc_search='';let cc_toastTimer=null;
+    const cc_statCount=document.getElementById('statCount'),cc_statSize=document.getElementById('statSize'),cc_cacheList=document.getElementById('cacheList'),cc_loadMore=document.getElementById('loadMore'),cc_btnLoadMore=document.getElementById('btnLoadMore'),cc_dateBefore=document.getElementById('dateBefore'),cc_confirmModal=document.getElementById('confirmModal'),cc_modalTitle=document.getElementById('modalTitle'),cc_modalDesc=document.getElementById('modalDesc'),cc_modalConfirmBtn=document.getElementById('modalConfirmBtn'),cc_lightbox=document.getElementById('lightbox'),cc_lightboxImg=document.getElementById('lightboxImg'),cc_searchInput=document.getElementById('searchInput'),cc_searchClear=document.getElementById('searchClear'),cc_cacheEmpty=document.getElementById('cacheEmpty');
+
+    function fmtSize(bytes){if(bytes<1024)return bytes+' B';if(bytes<1048576)return(bytes/1024).toFixed(1)+' KB';return(bytes/1048576).toFixed(1)+' MB'}
+    function fmtDate(ts){if(!ts)return '—';const d=new Date(ts*1000),pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
+    function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+    window.closeModal=function(){cc_confirmModal.classList.remove('show');cc_pending=null}
+    window.modalConfirm=function(){if(cc_pending){cc_pending();cc_pending=null}closeModal()}
+    window.openLightbox=function(url){cc_lightboxImg.src=url;cc_lightbox.classList.add('show')}
+    window.closeLightbox=function(){cc_lightbox.classList.remove('show');cc_lightboxImg.src=''}
+
+    function showCCToast(msg,dur=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(cc_toastTimer);cc_toastTimer=setTimeout(()=>t.classList.remove('show'),dur)}
+
+    async function loadStats(){try{const r=await B.apiGet('caption_cache/stats'),d=r&&r.data?r.data:r;cc_statCount.textContent=d.count!=null?d.count.toLocaleString():'0';cc_statSize.textContent=d.db_size!=null?fmtSize(d.db_size):'0 B';cc_total=d.count||0;document.getElementById('btnClearAll').disabled=cc_total===0}catch(e){cc_statCount.textContent='—';cc_statSize.textContent='—'}}
+
+    function renderItem(item){
+      const el=document.createElement('div');el.className='cache-item';el.dataset.hash=item.img_hash;
+      const pe=document.createElement('div');pe.className='img-preview';
+      if(item.image_url&&(item.image_url.startsWith('http')||item.image_url.startsWith('/'))){pe.onclick=()=>openLightbox(item.image_url);const img=document.createElement('img');img.src=item.image_url;img.loading='lazy';img.onerror=()=>{pe.innerHTML='<div class="no-img">🖼️</div><div class="no-img-label">加载失败</div>'};pe.appendChild(img)}else{pe.innerHTML='<div class="no-img">🖼️</div><div class="no-img-label">URL 未记录</div>'}
+      el.appendChild(pe);
+      const hashShort=item.img_hash.length>12?item.img_hash.slice(0,12)+'…':item.img_hash;
+      const ce=document.createElement('div');ce.className='item-content';
+      ce.innerHTML=`<div class="item-caption" data-hash="${item.img_hash}" onclick="startCacheEdit(this)">${escapeHtml(item.caption||'(无转述内容)')}</div><div class="item-meta"><span class="hash" title="${item.img_hash}">${hashShort}</span><span>📅 ${fmtDate(item.created_at)}</span></div>`;el.appendChild(ce);
+      const ae=document.createElement('div');ae.className='item-actions';ae.innerHTML=`<button class="btn btn-danger btn-sm" onclick="deleteCacheItem('${item.img_hash}',this)">删除</button>`;el.appendChild(ae);
+      return el;
+    }
+
+    window.deleteCacheItem=async function(hash,btnEl){cc_confirmModal.classList.add('show');cc_modalTitle.textContent='确认删除';cc_modalDesc.textContent='确定要删除这条缓存记录吗？此操作不可撤销。';cc_pending=async()=>{try{await B.apiPost('caption_cache/delete',{img_hash:hash});const el=btnEl.closest('.cache-item');if(el){el.classList.add('removing');setTimeout(()=>el.remove(),400)}showCCToast('已删除');await loadStats()}catch(e){showCCToast('删除失败: '+e.message)}}}
+
+    window.startCacheEdit=function(captionEl){if(captionEl.classList.contains('editing'))return;const hash=captionEl.dataset.hash,currentText=captionEl.textContent;captionEl.classList.add('editing');const ea=document.createElement('div');ea.className='edit-area';ea.innerHTML=`<textarea>${escapeHtml(currentText==='(无转述内容)'?'':currentText)}</textarea><div class="edit-actions"><button class="btn btn-cancel btn-sm" onclick="cancelCacheEdit(this)">取消</button><button class="btn btn-primary btn-sm" onclick="saveCacheEdit(this,'${hash}')">✓ 保存</button></div>`;captionEl.style.display='none';captionEl.parentElement.insertBefore(ea,captionEl.nextSibling);const ta=ea.querySelector('textarea');ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}
+
+    window.cancelCacheEdit=function(btn){const ea=btn.closest('.edit-area'),cel=ea.previousElementSibling;cel.style.display='';cel.classList.remove('editing');ea.remove()}
+
+    window.saveCacheEdit=async function(btn,hash){const ea=btn.closest('.edit-area'),ta=ea.querySelector('textarea'),nc=ta.value.trim(),cel=ea.previousElementSibling;btn.disabled=true;btn.textContent='保存中…';try{await B.apiPost('caption_cache/update',{img_hash:hash,caption:nc});cel.textContent=nc||'(无转述内容)';cel.style.display='';cel.classList.remove('editing');ea.remove();showCCToast('已保存')}catch(e){showCCToast('保存失败: '+e.message);btn.disabled=false;btn.textContent='✓ 保存'}}
+
+    window.confirmClearAll=function(){cc_confirmModal.classList.add('show');cc_modalTitle.textContent='清空所有缓存';cc_modalDesc.textContent=`确定要清空全部 ${cc_total} 条缓存记录吗？此操作不可撤销。`;cc_pending=async()=>{try{const r=await B.apiPost('caption_cache/clear'),deleted=r&&r.deleted!=null?r.deleted:0;showCCToast(`已清空 ${deleted} 条缓存`);cc_offset=0;allItems=[];await Promise.all([loadStats(),loadItems()])}catch(e){showCCToast('清空失败: '+e.message)}}}
+
+    window.confirmClearBefore=function(){const val=cc_dateBefore.value;if(!val){showCCToast('请先选择日期');return}const ts=new Date(val+'T23:59:59').getTime()/1000;cc_confirmModal.classList.add('show');cc_modalTitle.textContent='按时间清理缓存';cc_modalDesc.textContent=`确定要删除 ${val} 之前的所有缓存吗？此操作不可撤销。`;cc_pending=async()=>{try{const r=await B.apiPost('caption_cache/clear_before',{before:ts}),deleted=r&&r.deleted!=null?r.deleted:0;showCCToast(`已清理 ${deleted} 条缓存`);cc_offset=0;allItems=[];await Promise.all([loadStats(),loadItems()])}catch(e){showCCToast('清理失败: '+e.message)}}}
+
+    async function loadItems(append=false){try{const params={offset:cc_offset,limit:PAGE_SIZE};if(cc_search)params.search=cc_search;const r=await B.apiGet('caption_cache',params),d=r&&r.data?r.data:r,items=d.items||[];cc_total=d.total||0;if(!append)cc_cacheList.innerHTML='';if(cc_total===0&&!append){cc_cacheEmpty.style.display='';cc_loadMore.style.display='none';return}else{cc_cacheEmpty.style.display='none'}items.forEach(i=>{const el=renderItem(i);cc_cacheList.appendChild(el);requestAnimationFrame(()=>el.classList.add('visible'))});allItems=append?allItems.concat(items):items;cc_offset+=items.length;if(cc_offset>=cc_total){cc_loadMore.style.display='none'}else{cc_loadMore.style.display='';cc_loadMore.classList.add('visible')}}catch(e){cc_cacheList.innerHTML='<div class="empty-state"><div class="icon">⚠️</div><div>加载失败</div><div class="hint">'+e.message+'</div></div>'}}
+
+    window.loadMore=async function(){cc_btnLoadMore.disabled=true;cc_btnLoadMore.textContent='加载中…';await loadItems(true);cc_btnLoadMore.disabled=false;cc_btnLoadMore.textContent='加载更多'}
+
+    window.clearSearch=function(){cc_searchInput.value='';cc_searchClear.classList.remove('show');if(cc_search){cc_search='';cc_offset=0;allItems=[];loadItems()}cc_searchInput.focus()}
+
+    let st=null;cc_searchInput.addEventListener('input',()=>{const v=cc_searchInput.value.trim();cc_searchClear.classList.toggle('show',v.length>0);clearTimeout(st);st=setTimeout(()=>{if(v===cc_search)return;cc_search=v;cc_offset=0;allItems=[];loadItems()},350)});
+    cc_searchInput.addEventListener('keydown',e=>{if(e.key==='Escape'){cc_searchInput.value='';cc_searchClear.classList.remove('show');if(cc_search){cc_search='';cc_offset=0;allItems=[];loadItems()}}});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeLightbox()}});
+    await Promise.all([loadStats(),loadItems()]);
+  }
+
+  // Init admin
+  loadData();
+}
+</script>
+</body>
+</html>

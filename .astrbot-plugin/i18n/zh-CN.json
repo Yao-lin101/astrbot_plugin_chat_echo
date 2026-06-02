@@ -1,0 +1,7 @@
+{
+  "pages": {
+    "admin": { "title": "设置" },
+    "caption_cache": { "title": "图片缓存" },
+    "token_stats": { "title": "Token 统计" }
+  }
+}
