@@ -2,7 +2,7 @@
 
 [![AstrBot](https://img.shields.io/badge/AstrBot-Plugin-blue)](https://github.com/AstrBotDevs/AstrBot)
 [![License](https://img.shields.io/badge/License-AGPLv3-green)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.0-blueviolet)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.1-blueviolet)](CHANGELOG.md)
 
 ## 简介
 

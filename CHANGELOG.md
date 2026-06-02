@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.1] - 2026-06-02
+
+### 修复
+- 🐛 修复 SQLite `database is locked` 并发写入错误 — 启用 WAL 日志模式并设置 30 秒连接超时
+- 🐛 修复唤醒后活跃度未定义导致 `UnboundLocalError: cannot access local variable 'scale'` 崩溃
+- 🐛 修复白名单配置后非白名单群被完全关闭 — `is_group_allowed` 改为始终返回 True，白名单仅控制概率覆盖
+
+### 优化
+- 🔧 WebUI 页面整合 — 将「Token 用量统计」和「图片转述缓存管理」合并到统一的管理面板中，支持标签页切换
+- 🔧 新增 `filter_prefixes` 配置项 — 可自定义指令前缀过滤列表，避免 `/bot在干嘛` 等指令消息被送入 LLM 分析
+- 🔧 Analyzer 日志级别从 info 降为 debug，减少日常运行日志噪音
+
 ## [1.2.0] - 2026-06-02
 
 ### 新增
