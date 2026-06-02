@@ -31,6 +31,14 @@ function showToast(msg, dur) {
 }
 
 // ===== 标签页切换 =====
+// 仅「设置类」标签需要底部保存栏；用量统计 / 缓存管理属于查看类，无需保存。
+var SETTINGS_TABS = ['persona', 'general', 'reply', 'keyword', 'batch', 'human'];
+
+function applyFooterForTab(tabName) {
+  var footer = document.querySelector('.footer-bar');
+  if (footer) footer.style.display = SETTINGS_TABS.indexOf(tabName) >= 0 ? 'flex' : 'none';
+}
+
 function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
   document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
@@ -40,6 +48,8 @@ function switchTab(tabName) {
   if (btn) btn.classList.add('active');
   var panel = document.getElementById('tab-' + tabName);
   if (panel) panel.classList.add('active');
+  // 设置类标签才显示底部保存栏
+  applyFooterForTab(tabName);
   // 切到缓存管理时懒加载统计与列表
   if (tabName === 'cache') {
     cc_offset = 0;

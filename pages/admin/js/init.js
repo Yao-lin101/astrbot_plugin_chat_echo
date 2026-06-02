@@ -44,6 +44,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
+  // 同步底部保存栏显隐到当前激活标签（默认是用量统计 → 隐藏）
+  var activeBtn = document.querySelector('.tab-btn.active');
+  if (activeBtn) {
+    var m = activeBtn.getAttribute('onclick').match(/'([^']+)'/);
+    if (m) applyFooterForTab(m[1]);
+  }
+
   // 首屏加载：配置表单 + 用量统计（默认展示用量统计标签页）
   loadData();
   updateStats('month');
