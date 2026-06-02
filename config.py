@@ -284,6 +284,10 @@ class ConfigHelper:
         raw = self.cfg("proactive_analyzer_system_prompt", "")
         return raw.strip() or DEFAULT_PROACTIVE_ANALYZER_PROMPT
 
+    def persona_replies(self) -> list:
+        """Return the custom per-persona reply prompt list from config."""
+        return self.cfg("persona_replies", []) or []
+
     def is_match_group(self, gid: str, group_id: str, umo: str) -> bool:
         if gid == group_id or gid == umo:
             return True
