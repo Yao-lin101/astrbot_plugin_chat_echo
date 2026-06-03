@@ -68,7 +68,7 @@ function loadData() {
     });
 
     // 开关型输入（复选）
-    ['enable_llm_tools', 'enable_keyword_trigger', 'enable_keyword_on_image', 'enable_image_caption',
+    ['enable_llm_tools', 'enable_keyword_trigger', 'enable_keyword_llm_judgment', 'enable_keyword_on_image', 'enable_image_caption',
      'batch_analysis_enabled', 'instant_at_bot', 'human_like_mode'].forEach(function (k) {
       var el = document.getElementById(k);
       if (el && config[k] !== undefined) el.checked = !!config[k];
@@ -176,7 +176,7 @@ function saveAll() {
   });
 
   // 开关型字段
-  ['enable_llm_tools', 'enable_keyword_trigger', 'enable_keyword_on_image', 'enable_image_caption',
+  ['enable_llm_tools', 'enable_keyword_trigger', 'enable_keyword_llm_judgment', 'enable_keyword_on_image', 'enable_image_caption',
    'batch_analysis_enabled', 'instant_at_bot', 'human_like_mode'].forEach(function (k) {
     u[k] = document.getElementById(k).checked;
   });

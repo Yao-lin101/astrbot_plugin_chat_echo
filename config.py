@@ -99,13 +99,23 @@ def parse_group_entry(entry) -> list[tuple[str, int | None, int | None]]:
         parts = entry.split(":")
 
         platforms = {
-            "aiocqhttp", "telegram", "discord", "lark", "qq_official",
-            "dingtalk", "kook", "slack", "mattermost", "satori",
+            "aiocqhttp",
+            "telegram",
+            "discord",
+            "lark",
+            "qq_official",
+            "dingtalk",
+            "kook",
+            "slack",
+            "mattermost",
+            "satori",
         }
         is_umo = False
         if len(parts) >= 3:
             if parts[0] in platforms or parts[1] in {
-                "GroupMessage", "PrivateMessage", "GuildMessage",
+                "GroupMessage",
+                "PrivateMessage",
+                "GuildMessage",
             }:
                 is_umo = True
 
@@ -199,6 +209,9 @@ class ConfigHelper:
     def enable_keyword_trigger(self) -> bool:
         return bool(self.cfg("enable_keyword_trigger", False))
 
+    def enable_keyword_llm_judgment(self) -> bool:
+        return bool(self.cfg("enable_keyword_llm_judgment", False))
+
     def enable_keyword_on_image(self) -> bool:
         return bool(self.cfg("enable_keyword_on_image", False))
 
@@ -208,7 +221,9 @@ class ConfigHelper:
     def keyword_default_probability(self) -> int:
         return int(self.cfg("keyword_default_probability", 100))
 
-    def get_matched_keyword(self, group_id: str, content: str) -> tuple[str | None, int | None]:
+    def get_matched_keyword(
+        self, group_id: str, content: str
+    ) -> tuple[str | None, int | None]:
         """Check if content matches any keyword rule applicable to this group.
         Returns (matched_keyword, probability) or (None, None).
         """

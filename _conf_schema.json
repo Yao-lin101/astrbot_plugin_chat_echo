@@ -150,6 +150,12 @@
     "hint": "开启后，当群聊消息中提到设置的兴趣关键词时，将按概率触发回复",
     "default": false
   },
+  "enable_keyword_llm_judgment": {
+    "type": "bool",
+    "description": "关键词模式 - 启用 LLM 介入判断",
+    "hint": "开启后，当触发关键词时，会先调用 LLM (使用主动分析提示词) 判断当前上下文是否有插话/参与讨论的空间，避免硬回复显得人机。关闭则直接触发回复。",
+    "default": false
+  },
   "keyword_rules": {
     "type": "template_list",
     "description": "兴趣关键词列表",

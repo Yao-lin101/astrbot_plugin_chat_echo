@@ -10,7 +10,11 @@ from ..helpers import (
     is_probability_hit,
     maybe_typing_delay,
 )
-from ..services.image_caption import get_image_caption, prewarm_captions
+from ..services.image_caption import (
+    ensure_context_captions,
+    get_image_caption,
+    prewarm_captions,
+)
 from .batch import (
     flush_batch_proactive,
     flush_batch_reply,
@@ -78,7 +82,62 @@ async def handle_keyword(
     group_id = str(event.get_group_id())
     try:
         plugin.logger.info(
-            f"[Keyword] Keyword '{matched_keyword}' matched in group {group_id}. Triggering native reply..."
+            f"[Keyword] Keyword '{matched_keyword}' matched in group {group_id}."
+        )
+
+        if plugin.config_helper.enable_keyword_llm_judgment():
+            await ensure_context_captions(
+                plugin, recent_window, event.unified_msg_origin
+            )
+
+            context_lines = ["=== 群聊中的最近消息 ==="]
+            all_image_urls = []
+            for m in recent_window:
+                context_lines.append(f"{m['user_name']}: {m['content']}")
+                if m.get("image_urls"):
+                    all_image_urls.extend(m["image_urls"])
+            context_text = "\n".join(context_lines)
+
+            if plugin.config_helper.enable_image_caption():
+                all_image_urls = None
+
+            persona_name = ""
+            try:
+                personality = (
+                    await plugin.context.persona_manager.get_default_persona_v3(
+                        event.unified_msg_origin
+                    )
+                )
+                if personality:
+                    persona_name = personality.get("name") or ""
+            except Exception:
+                pass
+
+            plugin.logger.info(
+                f"[Keyword] Calling LLM analyzer to judge if Bot should join the conversation for keyword '{matched_keyword}' in group {group_id}..."
+            )
+            analysis = await plugin.llm_handler.call_proactive_analyzer(
+                context_text,
+                image_urls=all_image_urls,
+                umo=event.unified_msg_origin,
+                self_id=event.get_self_id(),
+                persona_name=persona_name,
+            )
+            if analysis is None:
+                return False
+            should_join = analysis.get("should_join", "no")
+            reason = analysis.get("reason", "")
+            if should_join == "no":
+                plugin.logger.info(
+                    f"[Keyword] Group {group_id} does not warrant participation for keyword '{matched_keyword}' ({reason})"
+                )
+                return False
+            plugin.logger.info(
+                f"[Keyword] Group {group_id} approved for participation for keyword '{matched_keyword}' | Reason: {reason}"
+            )
+
+        plugin.logger.info(
+            f"[Keyword] Triggering native reply for keyword '{matched_keyword}' in group {group_id}..."
         )
         await maybe_typing_delay(plugin)
         return True
