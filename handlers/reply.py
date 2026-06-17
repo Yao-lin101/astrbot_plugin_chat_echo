@@ -101,9 +101,11 @@ async def handle_reply(
         )
         if analysis is None:
             return False
-        is_reply = analysis.get("need_reply", "no")
+        need_reply = analysis.get("need_reply", False)
+        if isinstance(need_reply, str):
+            need_reply = need_reply.strip().lower() in ("true", "yes")
         reason = analysis.get("reason", "")
-        if is_reply == "no":
+        if not need_reply:
             tracker.detection_count += 1
             max_detect = plugin.config_helper.max_detection_count()
             plugin.logger.info(
@@ -171,7 +173,9 @@ async def handle_reply_batch(
         )
         if analysis is None:
             return False
-        is_reply = analysis.get("need_reply", "no")
+        need_reply = analysis.get("need_reply", False)
+        if isinstance(need_reply, str):
+            need_reply = need_reply.strip().lower() in ("true", "yes")
         reason = analysis.get("reason", "")
 
         # Each batch counts as detection_count increment + number of messages in batch
@@ -179,7 +183,7 @@ async def handle_reply_batch(
         tracker.detection_count += len(batch_messages)
         max_detect = plugin.config_helper.max_detection_count()
 
-        if is_reply == "no":
+        if not need_reply:
             plugin.logger.info(
                 f"[ReplyBatch] Group {group_id} batch not replying to Bot ({reason}) | "
                 f"{tracker.detection_count}/{max_detect}"

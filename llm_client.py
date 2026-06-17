@@ -111,8 +111,9 @@ class LLMHandler:
         system_prompt = self.config_helper.proactive_analyzer_prompt()
         system_prompt += (
             "\n\n请用以下 JSON 格式回复（请只输出 JSON 块，不要包含其他解释或标记）：\n"
+            "注意：`should_join` 的值必须是布尔值（true 或 false，不需要双引号）。\n"
             "{\n"
-            '  "should_join": "yes|no",\n'
+            '  "should_join": true,\n'
             '  "reason": "原因说明"\n'
             "}"
         )
@@ -192,8 +193,9 @@ class LLMHandler:
         system_prompt = self.config_helper.analyzer_prompt()
         system_prompt += (
             "\n\n请用以下 JSON 格式回复（请只输出 JSON 块，不要包含其他解释或标记）：\n"
+            "注意：`need_reply` 的值必须是布尔值（true 或 false，不需要双引号）。\n"
             "{\n"
-            '  "need_reply": "yes|no",\n'
+            '  "need_reply": true,\n'
             '  "reason": "原因说明"\n'
             "}"
         )

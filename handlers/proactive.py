@@ -70,9 +70,11 @@ async def handle_proactive(
         )
         if analysis is None:
             return False
-        should_join = analysis.get("should_join", "no")
+        should_join = analysis.get("should_join", False)
+        if isinstance(should_join, str):
+            should_join = should_join.strip().lower() in ("true", "yes")
         reason = analysis.get("reason", "")
-        if should_join == "no":
+        if not should_join:
             plugin.logger.info(
                 f"[Proactive] Group {group_id} does not warrant participation ({reason})"
             )
@@ -145,9 +147,11 @@ async def handle_proactive_batch(
         )
         if analysis is None:
             return False
-        should_join = analysis.get("should_join", "no")
+        should_join = analysis.get("should_join", False)
+        if isinstance(should_join, str):
+            should_join = should_join.strip().lower() in ("true", "yes")
         reason = analysis.get("reason", "")
-        if should_join == "no":
+        if not should_join:
             plugin.logger.info(
                 f"[ProactiveBatch] Group {group_id} does not warrant participation ({reason})"
             )
