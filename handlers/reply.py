@@ -100,6 +100,9 @@ async def handle_reply(
             persona_name=persona_name,
         )
         if analysis is None:
+            plugin.logger.warning(
+                f"[Reply] Group {group_id} reply analysis failed (LLM returned None or invalid JSON)."
+            )
             return False
         need_reply = analysis.get("need_reply", False)
         if isinstance(need_reply, str):
@@ -172,6 +175,9 @@ async def handle_reply_batch(
             persona_name=persona_name,
         )
         if analysis is None:
+            plugin.logger.warning(
+                f"[ReplyBatch] Group {group_id} batch reply analysis failed (LLM returned None or invalid JSON)."
+            )
             return False
         need_reply = analysis.get("need_reply", False)
         if isinstance(need_reply, str):

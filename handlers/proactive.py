@@ -69,6 +69,9 @@ async def handle_proactive(
             persona_name=persona_name,
         )
         if analysis is None:
+            plugin.logger.warning(
+                f"[Proactive] Group {group_id} proactive analysis failed (LLM returned None or invalid JSON)."
+            )
             return False
         should_join = analysis.get("should_join", False)
         if isinstance(should_join, str):
@@ -146,6 +149,9 @@ async def handle_proactive_batch(
             persona_name=persona_name,
         )
         if analysis is None:
+            plugin.logger.warning(
+                f"[ProactiveBatch] Group {group_id} batch proactive analysis failed (LLM returned None or invalid JSON)."
+            )
             return False
         should_join = analysis.get("should_join", False)
         if isinstance(should_join, str):
