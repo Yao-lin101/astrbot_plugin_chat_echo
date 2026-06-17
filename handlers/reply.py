@@ -101,7 +101,7 @@ async def handle_reply(
         )
         if analysis is None:
             return False
-        is_reply = analysis.get("is_reply_to_bot", "no")
+        is_reply = analysis.get("need_reply", "no")
         reason = analysis.get("reason", "")
         if is_reply == "no":
             tracker.detection_count += 1
@@ -171,7 +171,7 @@ async def handle_reply_batch(
         )
         if analysis is None:
             return False
-        is_reply = analysis.get("is_reply_to_bot", "no")
+        is_reply = analysis.get("need_reply", "no")
         reason = analysis.get("reason", "")
 
         # Each batch counts as detection_count increment + number of messages in batch

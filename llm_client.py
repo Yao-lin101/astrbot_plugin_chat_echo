@@ -109,6 +109,13 @@ class LLMHandler:
         prompt = f"请分析以下群聊内容：\n\n{context_text}\n\n请判断你是否应该参与讨论。"
         provider_id = self.config_helper.analyzer_provider()
         system_prompt = self.config_helper.proactive_analyzer_prompt()
+        system_prompt += (
+            "\n\n请用以下 JSON 格式回复（请只输出 JSON 块，不要包含其他解释或标记）：\n"
+            "{\n"
+            '  "should_join": "yes|no",\n'
+            '  "reason": "原因说明"\n'
+            "}"
+        )
 
         identity_hints = []
         if self_id:
@@ -183,6 +190,13 @@ class LLMHandler:
         prompt = f"请分析以下群聊上下文：\n\n{context_text}\n\n请判断现在是否需要发言。"
         provider_id = self.config_helper.analyzer_provider()
         system_prompt = self.config_helper.analyzer_prompt()
+        system_prompt += (
+            "\n\n请用以下 JSON 格式回复（请只输出 JSON 块，不要包含其他解释或标记）：\n"
+            "{\n"
+            '  "need_reply": "yes|no",\n'
+            '  "reason": "原因说明"\n'
+            "}"
+        )
 
         identity_hints = []
         if self_id:
