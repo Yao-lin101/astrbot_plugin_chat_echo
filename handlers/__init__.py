@@ -93,6 +93,8 @@ async def handle_keyword(
             context_lines = ["=== 群聊中的最近消息 ==="]
             all_image_urls = []
             for m in recent_window:
+                if not m.get("content", "").strip():
+                    continue
                 context_lines.append(f"{m['user_name']}: {m['content']}")
                 if m.get("image_urls"):
                     all_image_urls.extend(m["image_urls"])

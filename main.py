@@ -79,7 +79,7 @@ class EchoPlugin(Star):
                     {
                         "user_name": "你",
                         "user_id": "bot",
-                        "content": bot_text,
+                        "content": bot_text or "[图片/表情]",
                         "image_urls": [],
                         "time": time.time(),
                         "is_at_bot": False,

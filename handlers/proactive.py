@@ -12,6 +12,8 @@ def build_proactive_batch_context(batch_messages: list[dict]) -> tuple[str, list
     context_lines.append("[以下为本批次积累的消息，请综合判断是否应该参与讨论:]")
     all_image_urls = []
     for m in batch_messages:
+        if not m.get("content", "").strip():
+            continue
         context_lines.append(f"{m['user_name']}: {m['content']}")
         if m.get("image_urls"):
             all_image_urls.extend(m["image_urls"])
@@ -40,6 +42,8 @@ async def handle_proactive(
         context_lines = ["=== 群聊中的最近消息 ==="]
         all_image_urls = []
         for m in recent_window:
+            if not m.get("content", "").strip():
+                continue
             context_lines.append(f"{m['user_name']}: {m['content']}")
             if m.get("image_urls"):
                 all_image_urls.extend(m["image_urls"])
