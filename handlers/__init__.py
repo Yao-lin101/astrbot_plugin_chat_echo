@@ -25,6 +25,49 @@ from .proactive import handle_proactive
 from .reply import handle_reply
 
 
+async def post_process_group_context(
+    plugin, event: AstrMessageEvent, image_urls: list[str]
+) -> None:
+    """Post-process the latest record in native GroupChatContext to add image captions or Chinese fallback."""
+    gcc = plugin.get_group_chat_context()
+    if not gcc:
+        return
+    umo = event.unified_msg_origin
+    lock = gcc._get_lock(umo)
+    async with lock:
+        records = gcc.raw_records.get(umo)
+        if not records:
+            return
+
+        last_record = records[-1]
+
+        # If the record contains the untranslated native "[Image]" tag
+        if " [Image]" in last_record:
+            captions = []
+            if image_urls:
+                for url in image_urls:
+                    img_hash = await plugin.caption_cache.get_hash(url)
+                    cached = plugin.caption_cache.get(img_hash)
+                    if cached:
+                        captions.append(cached)
+                    elif plugin.config_helper.enable_image_caption():
+                        caption = await get_image_caption(
+                            plugin, url, umo, force=True
+                        )
+                        if caption:
+                            captions.append(caption)
+
+            if captions:
+                new_content = " " + " ".join(
+                    f"[图片描述: {cap}]" for cap in captions
+                )
+                new_record = last_record.replace(" [Image]", new_content)
+            else:
+                new_record = last_record.replace(" [Image]", " [图片/表情]")
+
+            records[-1] = new_record
+
+
 async def start_tracking(
     plugin, event: AstrMessageEvent, bot_message: str = ""
 ) -> None:
@@ -73,7 +116,6 @@ async def handle_keyword(
     plugin,
     event: AstrMessageEvent,
     msg: dict,
-    recent_window: list[dict],
     matched_keyword: str,
 ) -> bool:
     """Process message under keyword trigger (Route 3).
@@ -86,22 +128,14 @@ async def handle_keyword(
         )
 
         if plugin.config_helper.enable_keyword_llm_judgment():
-            await ensure_context_captions(
-                plugin, recent_window, event.unified_msg_origin
-            )
-
             context_lines = ["=== 群聊中的最近消息 ==="]
-            all_image_urls = []
-            for m in recent_window:
-                if not m.get("content", "").strip():
-                    continue
-                context_lines.append(f"{m['user_name']}: {m['content']}")
-                if m.get("image_urls"):
-                    all_image_urls.extend(m["image_urls"])
+            all_image_urls = None
+            gcc = plugin.get_group_chat_context()
+            if gcc:
+                records = list(gcc.raw_records.get(event.unified_msg_origin, []))
+                for record in records[-10:]:
+                    context_lines.append(record)
             context_text = "\n".join(context_lines)
-
-            if plugin.config_helper.enable_image_caption():
-                all_image_urls = None
 
             persona_name = ""
             try:
@@ -286,8 +320,9 @@ async def process_group_message(plugin, event: AstrMessageEvent) -> None:
         "is_wake": was_at_or_wake,
     }
 
-    # PROACTIVE_WINDOW_SIZE is 10
-    window = plugin.tracker_manager.add_to_recent(group_id, msg, 10)
+    # History is tracked by native GroupChatContext
+    if not is_bot:
+        await post_process_group_context(plugin, event, image_urls)
 
     if is_bot:
         return
@@ -353,7 +388,7 @@ async def process_group_message(plugin, event: AstrMessageEvent) -> None:
                     plugin.tracker_manager.set_active_thinking(group_id, True)
                     try:
                         res = await handle_keyword(
-                            plugin, event, msg, window, matched_keyword
+                            plugin, event, msg, matched_keyword
                         )
                         if res:
                             event.is_at_or_wake_command = True
@@ -384,8 +419,7 @@ async def process_group_message(plugin, event: AstrMessageEvent) -> None:
         else:
             tracker.expire_at = now + plugin.config_helper.track_timeout()
 
-            # Also collect in legacy list (for compatibility with existing handlers)
-            tracker.collected.append(msg)
+            # History is tracked by native GroupChatContext
 
             if tracker.analyzing or plugin.tracker_manager.is_active_thinking(group_id):
                 return
@@ -477,7 +511,7 @@ async def process_group_message(plugin, event: AstrMessageEvent) -> None:
     if not plugin.config_helper.batch_analysis_enabled():
         # ---- Legacy instant proactive ----
         plugin.tracker_manager.set_active_thinking(group_id, True)
-        res = await handle_proactive(plugin, event, msg, window)
+        res = await handle_proactive(plugin, event, msg)
         if res:
             event.is_at_or_wake_command = True
             event.set_extra("chat_echo_triggered", True)

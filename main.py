@@ -106,17 +106,7 @@ class EchoPlugin(Star):
 
                 if not tracker.bot_message_sent:
                     tracker.bot_message = content
-                else:
-                    tracker.collected.append(
-                        {
-                            "user_name": "你",
-                            "user_id": "bot",
-                            "content": content,
-                            "image_urls": image_urls,
-                            "time": time.time(),
-                            "is_at_bot": False,
-                        }
-                    )
+                await self.append_bot_message_to_context(umo, content)
                 tracker.last_llm_text = content
                 tracker.last_llm_time = time.time()
                 tracker.detection_count = 0
@@ -151,6 +141,7 @@ class EchoPlugin(Star):
                             captions.append(f"[图片描述: {cached}]")
                     content = " ".join(captions) if captions else "[图片/表情]"
                 await start_tracking(self, event, content)
+                await self.append_bot_message_to_context(umo, content)
                 tracker = self.tracker_manager.get_tracker(group_id)
                 if tracker:
                     tracker.last_llm_text = content
@@ -187,6 +178,7 @@ class EchoPlugin(Star):
                         captions.append(f"[图片描述: {cached}]")
                 content = " ".join(captions) if captions else "[图片/表情]"
             await start_tracking(self, event, content)
+            await self.append_bot_message_to_context(umo, content)
             tracker = self.tracker_manager.get_tracker(group_id)
             if tracker:
                 tracker.last_llm_text = content
@@ -200,37 +192,63 @@ class EchoPlugin(Star):
         if not event.get_extra("chat_echo_triggered"):
             return
 
-        group_id = str(event.get_group_id())
-        tracker = self.tracker_manager.get_tracker(group_id)
-
-        recent_msgs = []
-        if tracker:
-            recent_msgs = tracker.collected
-        else:
-            recent_msgs = self.tracker_manager.get_recent(group_id) or []
-
+        umo = event.unified_msg_origin
         injected_contexts = []
-        msgs_to_inject = recent_msgs[:-1] if recent_msgs else []
+        gcc = self.get_group_chat_context()
+        if gcc:
+            record_id = event.get_extra("_group_context_record_id", None)
+            prompt_idx = event.get_extra("_group_context_raw_idx", -1)
+            
+            from collections import deque
+            lock = gcc._get_lock(umo)
+            async with lock:
+                records = gcc.raw_records.get(umo)
+                if records:
+                    raw_list = list(records)
+                    id_list = list(gcc._record_ids.get(umo, deque()))
+                    if isinstance(record_id, str) and record_id in id_list:
+                        prompt_idx = id_list.index(record_id)
+                    
+                    if 0 <= prompt_idx < len(raw_list):
+                        records_to_inject = raw_list[:prompt_idx]
+                        remaining = raw_list[prompt_idx + 1 :]
+                        remaining_ids = id_list[prompt_idx + 1 :] if id_list else []
+                        records.clear()
+                        records.extend(remaining)
+                        if id_list:
+                            record_ids = gcc._record_ids[umo]
+                            record_ids.clear()
+                            record_ids.extend(remaining_ids)
+                        
+                        for record in records_to_inject:
+                            if "]: " in record:
+                                header, content = record.split("]: ", 1)
+                                header = header[1:]
+                                if "/" in header:
+                                    nickname, _ = header.rsplit("/", 1)
+                                else:
+                                    nickname = header
+                            else:
+                                nickname = "Unknown"
+                                content = record
 
-        for msg in msgs_to_inject:
-            role = (
-                "assistant"
-                if msg["user_name"] == "你" or msg["user_id"] == "bot"
-                else "user"
-            )
-            content = msg["content"]
-            if role == "user":
-                content = f"{msg['user_name']}: {content}"
-            injected_contexts.append(
-                {"role": role, "content": content, "_no_save": True}
-            )
+                            role = "assistant" if nickname == "你" else "user"
+                            if role == "user":
+                                content = f"{nickname}: {content}"
+                            
+                            injected_contexts.append(
+                                {"role": role, "content": content, "_no_save": True}
+                            )
 
         if injected_contexts:
             event.set_extra("chat_echo_original_contexts", req.contexts)
             req.contexts = injected_contexts
             self.logger.debug(
-                f"[ChatEcho] Overwrote LLM contexts with {len(injected_contexts)} tracked group messages."
+                f"[ChatEcho] Overwrote LLM contexts with {len(injected_contexts)} tracked group messages from native GroupChatContext."
             )
+
+        event.set_extra("_group_context_record_id", None)
+        event.set_extra("_group_context_raw_idx", -1)
 
         mode = event.get_extra("chat_echo_mode")
         if mode == "keyword":
@@ -344,18 +362,10 @@ class EchoPlugin(Star):
             if not tracker.bot_message_sent:
                 tracker.bot_message_sent = True
                 tracker.bot_message = content
+                await self.append_bot_message_to_context(umo, content)
                 return
 
-            tracker.collected.append(
-                {
-                    "user_name": "你",
-                    "user_id": "bot",
-                    "content": content,
-                    "image_urls": image_urls,
-                    "time": time.time(),
-                    "is_at_bot": False,
-                }
-            )
+            await self.append_bot_message_to_context(umo, content)
             tracker.detection_count = 0
             tracker.expire_at = time.time() + self.config_helper.track_timeout()
         else:
@@ -365,6 +375,7 @@ class EchoPlugin(Star):
             ):
                 self.tracker_manager.set_active_thinking(group_id, False)
                 await start_tracking(self, event, content)
+                await self.append_bot_message_to_context(umo, content)
                 new_tracker = self.tracker_manager.get_tracker(group_id)
                 if new_tracker:
                     new_tracker.bot_message_sent = True
@@ -442,6 +453,34 @@ class EchoPlugin(Star):
         from .services.image_caption import get_image_caption
 
         return await get_image_caption(self, image_url, umo, force)
+
+    def get_group_chat_context(self):
+        """Retrieve the GroupChatContext instance from the registered stars."""
+        from astrbot.core.star.star import star_map
+        for star_meta in star_map.values():
+            if star_meta.star_cls and hasattr(star_meta.star_cls, "group_chat_context"):
+                return star_meta.star_cls.group_chat_context
+        return None
+
+    async def append_bot_message_to_context(self, umo: str, content: str):
+        """Safely append a bot message to the native GroupChatContext."""
+        gcc = self.get_group_chat_context()
+        if not gcc:
+            return
+        import uuid
+        from collections import deque
+        datetime_str = datetime.now().strftime("%H:%M:%S")
+        final_message = f"[你/{datetime_str}]: {content}"
+        lock = gcc._get_lock(umo)
+        async with lock:
+            records = gcc.raw_records[umo]
+            record_ids = gcc._record_ids[umo]
+            records.append(final_message)
+            record_ids.append(uuid.uuid4().hex)
+            while len(records) > 300:
+                records.popleft()
+                if record_ids:
+                    record_ids.popleft()
 
     async def terminate(self):
         self.logger.info("主动接话插件卸载中...")

@@ -6,30 +6,28 @@ from ..helpers import maybe_typing_delay
 from ..services.image_caption import ensure_context_captions
 
 
-def build_proactive_batch_context(batch_messages: list[dict]) -> tuple[str, list[str]]:
-    """Build proactive analysis context for batch mode."""
+def build_proactive_batch_context(plugin, umo: str, batch_size: int) -> tuple[str, list[str]]:
+    """Build proactive analysis context for batch mode using native GroupChatContext."""
     context_lines = ["=== 群聊中的最近消息 (批次分析) ==="]
     context_lines.append("[以下为本批次积累的消息，请综合判断是否应该参与讨论:]")
-    all_image_urls = []
-    for m in batch_messages:
-        if not m.get("content", "").strip():
-            continue
-        context_lines.append(f"{m['user_name']}: {m['content']}")
-        if m.get("image_urls"):
-            all_image_urls.extend(m["image_urls"])
+    gcc = plugin.get_group_chat_context()
+    if gcc:
+        records = list(gcc.raw_records.get(umo, []))
+        relevant_records = records[-batch_size:] if records else []
+        for record in relevant_records:
+            context_lines.append(record)
     context_text = "\n".join(context_lines)
-    return context_text, all_image_urls
+    return context_text, None
 
 
 async def handle_proactive(
-    plugin, event: AstrMessageEvent, msg: dict, recent_window: list[dict]
+    plugin, event: AstrMessageEvent, msg: dict
 ) -> bool:
     """Process message under proactive activation check (Route 2).
     Returns True if proactive participation is approved, False otherwise.
     """
     group_id = str(event.get_group_id())
     try:
-        await ensure_context_captions(plugin, recent_window, event.unified_msg_origin)
         gname = ""
         try:
             g = await event.get_group()
@@ -40,13 +38,12 @@ async def handle_proactive(
             plugin.logger.exception(f"[Proactive] Failed to get group name: {e}")
 
         context_lines = ["=== 群聊中的最近消息 ==="]
-        all_image_urls = []
-        for m in recent_window:
-            if not m.get("content", "").strip():
-                continue
-            context_lines.append(f"{m['user_name']}: {m['content']}")
-            if m.get("image_urls"):
-                all_image_urls.extend(m["image_urls"])
+        all_image_urls = None
+        gcc = plugin.get_group_chat_context()
+        if gcc:
+            records = list(gcc.raw_records.get(event.unified_msg_origin, []))
+            for record in records[-10:]:
+                context_lines.append(record)
         context_text = "\n".join(context_lines)
 
         if plugin.config_helper.enable_image_caption():
@@ -118,7 +115,6 @@ async def handle_proactive_batch(
     """Batch version of handle_proactive: analyze accumulated batch messages at once."""
     group_id = str(event.get_group_id())
     try:
-        await ensure_context_captions(plugin, batch_messages, event.unified_msg_origin)
         gname = ""
         try:
             g = await event.get_group()
@@ -128,7 +124,9 @@ async def handle_proactive_batch(
         except Exception as e:
             plugin.logger.exception(f"[ProactiveBatch] Failed to get group name: {e}")
 
-        context_text, all_image_urls = build_proactive_batch_context(batch_messages)
+        context_text, all_image_urls = build_proactive_batch_context(
+            plugin, event.unified_msg_origin, len(batch_messages)
+        )
         if plugin.config_helper.enable_image_caption():
             all_image_urls = None
 

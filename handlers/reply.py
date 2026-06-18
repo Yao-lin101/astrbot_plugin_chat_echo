@@ -7,60 +7,89 @@ from ..tracker import ConversationTracker
 MAX_CONTEXT_MESSAGES = 20
 
 
-def build_analyze_context(tracker: ConversationTracker) -> tuple[str, list[str]]:
-    """Build the analysis context string chronologically and gather all associated image URLs."""
+def build_analyze_context(plugin, tracker: ConversationTracker) -> tuple[str, list[str]]:
+    """Build the analysis context string chronologically using native GroupChatContext records."""
     lines = ["=== 群聊对话记录 (按时间顺序) ==="]
     idx = 1
+    
+    # Prepend the trigger message if we have it
     if tracker.trigger_message:
         lines.append(f"{idx}. {tracker.trigger_user_name}: {tracker.trigger_message}")
         idx += 1
-
-    lines.append(f"{idx}. 你: {tracker.bot_message or '[你发送了一条消息]'}")
-    idx += 1
-
-    collected = tracker.collected
-    all_image_urls = []
-    if len(collected) > MAX_CONTEXT_MESSAGES:
-        skipped = len(collected) - MAX_CONTEXT_MESSAGES
-        collected = collected[-MAX_CONTEXT_MESSAGES:]
-        lines.append(f"... (已省略中间 {skipped} 条消息)")
-    for msg in collected:
-        if not msg.get("content", "").strip():
-            continue
-        lines.append(f"{idx}. {msg['user_name']}: {msg['content']}")
-        idx += 1
-        if msg.get("image_urls"):
-            all_image_urls.extend(msg["image_urls"])
-    return "\n".join(lines), all_image_urls
+    
+    gcc = plugin.get_group_chat_context()
+    if gcc:
+        records = list(gcc.raw_records.get(tracker.unified_msg_origin, []))
+        # Find the index of the last record starting with "[你/"
+        bot_idx = -1
+        for i in range(len(records) - 1, -1, -1):
+            if records[i].startswith("[你/"):
+                bot_idx = i
+                break
+        
+        if bot_idx != -1:
+            relevant_records = records[bot_idx:]
+        else:
+            if tracker.bot_message:
+                lines.append(f"{idx}. 你: {tracker.bot_message}")
+                idx += 1
+            relevant_records = records
+            
+        # Limit context messages
+        if len(relevant_records) > MAX_CONTEXT_MESSAGES:
+            skipped = len(relevant_records) - MAX_CONTEXT_MESSAGES
+            relevant_records = relevant_records[-MAX_CONTEXT_MESSAGES:]
+            lines.append(f"... (已省略中间 {skipped} 条消息)")
+            
+        for record in relevant_records:
+            lines.append(f"{idx}. {record}")
+            idx += 1
+            
+    return "\n".join(lines), None
 
 
 def build_batch_context(
-    tracker: ConversationTracker, batch_messages: list[dict]
+    plugin, tracker: ConversationTracker, batch_messages: list[dict]
 ) -> tuple[str, list[str]]:
-    """Build analysis context for batch mode, marking the batch messages clearly."""
+    """Build analysis context for batch mode using native GroupChatContext."""
     lines = ["=== 群聊对话记录 (批次分析, 按时间顺序) ==="]
     idx = 1
+    
     if tracker.trigger_message:
         lines.append(f"{idx}. {tracker.trigger_user_name}: {tracker.trigger_message}")
         idx += 1
-
-    lines.append(f"{idx}. 你: {tracker.bot_message or '[你发送了一条消息]'}")
-    idx += 1
-
-    all_image_urls = []
-    batch = batch_messages
-    if len(batch) > MAX_CONTEXT_MESSAGES:
-        skipped = len(batch) - MAX_CONTEXT_MESSAGES
-        batch = batch[-MAX_CONTEXT_MESSAGES:]
-        lines.append(f"... (已省略中间 {skipped} 条消息)")
-    for msg in batch:
-        if not msg.get("content", "").strip():
-            continue
-        lines.append(f"{idx}. {msg['user_name']}: {msg['content']}")
-        idx += 1
-        if msg.get("image_urls"):
-            all_image_urls.extend(msg["image_urls"])
-    return "\n".join(lines), all_image_urls
+        
+    gcc = plugin.get_group_chat_context()
+    if gcc:
+        records = list(gcc.raw_records.get(tracker.unified_msg_origin, []))
+        
+        batch_size = len(batch_messages)
+        relevant_records = records[-batch_size:] if records else []
+        
+        bot_idx = -1
+        cutoff = len(records) - batch_size
+        for i in range(cutoff - 1, -1, -1):
+            if records[i].startswith("[你/"):
+                bot_idx = i
+                break
+                
+        if bot_idx != -1:
+            relevant_records = records[bot_idx:]
+        else:
+            if tracker.bot_message:
+                lines.append(f"{idx}. 你: {tracker.bot_message}")
+                idx += 1
+                
+        if len(relevant_records) > MAX_CONTEXT_MESSAGES:
+            skipped = len(relevant_records) - MAX_CONTEXT_MESSAGES
+            relevant_records = relevant_records[-MAX_CONTEXT_MESSAGES:]
+            lines.append(f"... (已省略中间 {skipped} 条消息)")
+            
+        for record in relevant_records:
+            lines.append(f"{idx}. {record}")
+            idx += 1
+            
+    return "\n".join(lines), None
 
 
 async def handle_reply(
@@ -71,12 +100,7 @@ async def handle_reply(
     """
     group_id = tracker.group_id
     try:
-        await ensure_context_captions(
-            plugin, tracker.collected, tracker.unified_msg_origin
-        )
-        context_text, image_urls = build_analyze_context(tracker)
-        if plugin.config_helper.enable_image_caption():
-            image_urls = None
+        context_text, image_urls = build_analyze_context(plugin, tracker)
 
         persona_name = ""
         try:
@@ -146,12 +170,7 @@ async def handle_reply_batch(
     """
     group_id = tracker.group_id
     try:
-        await ensure_context_captions(
-            plugin, batch_messages, tracker.unified_msg_origin
-        )
-        context_text, image_urls = build_batch_context(tracker, batch_messages)
-        if plugin.config_helper.enable_image_caption():
-            image_urls = None
+        context_text, image_urls = build_batch_context(plugin, tracker, batch_messages)
 
         persona_name = ""
         try:

@@ -12,7 +12,6 @@ class ConversationTracker:
         "trigger_user_name",
         "trigger_user_id",
         "trigger_message",
-        "collected",
         "expire_at",
         "analyzing",
         "detection_count",
@@ -46,7 +45,6 @@ class ConversationTracker:
         self.trigger_user_name = trigger_user_name
         self.trigger_user_id = trigger_user_id
         self.trigger_message = trigger_message
-        self.collected: list[dict] = []
         self.expire_at = time.time() + expire_seconds
         self.analyzing = False
         self.detection_count = 0
@@ -69,7 +67,6 @@ class TrackerManager:
 
     def __init__(self):
         self.trackers: dict[str, ConversationTracker] = {}
-        self.recent_messages: dict[str, list[dict]] = {}
         self.active_thinking: dict[str, bool] = {}
         self.proactive_flag: dict[str, bool] = {}
         self.active_cooldowns: dict[str, float] = {}
@@ -269,17 +266,7 @@ class TrackerManager:
         tracker.batch_timer = None
         return batch
 
-    def add_to_recent(self, group_id: str, msg: dict, max_size: int) -> list[dict]:
-        if group_id not in self.recent_messages:
-            self.recent_messages[group_id] = []
-        window = self.recent_messages[group_id]
-        window.append(msg)
-        if len(window) > max_size:
-            window.pop(0)
-        return window
 
-    def get_recent(self, group_id: str) -> list[dict]:
-        return self.recent_messages.get(group_id, [])
 
     def is_active_thinking(self, group_id: str) -> bool:
         ts = self.active_thinking.get(group_id)
@@ -321,7 +308,6 @@ class TrackerManager:
             self._cancel_batch_timer(tracker)
             tracker.alive = False
         self.trackers.clear()
-        self.recent_messages.clear()
         self.active_thinking.clear()
         self.proactive_flag.clear()
         self.active_cooldowns.clear()
