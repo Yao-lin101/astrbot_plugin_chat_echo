@@ -18,6 +18,7 @@ class ConversationTracker:
         "detection_count",
         "alive",
         "group_name",
+        "bot_message_sent",
         # Batch analysis fields
         "batch_buffer",
         "batch_first_msg_time",
@@ -49,6 +50,7 @@ class ConversationTracker:
         self.detection_count = 0
         self.alive = True
         self.group_name = ""
+        self.bot_message_sent = False
         # Batch analysis state
         self.batch_buffer: list[dict] = []
         self.batch_first_msg_time = 0.0

@@ -74,49 +74,7 @@ class EchoPlugin(Star):
         if chat_echo_triggered:
             self.tracker_manager.set_active_thinking(group_id, False)
             tracker = self.tracker_manager.get_tracker(group_id)
-            if tracker and tracker.alive:
-                # When bot_text is empty (e.g. image-only reply), try caption cache
-                content = bot_text
-                image_urls = []
-                if not content:
-                    try:
-                        result = event.get_result()
-                        if result and hasattr(result, "chain") and result.chain:
-                            from astrbot.api.message_components import (
-                                Image as ImageComponent,
-                            )
-
-                            for comp in result.chain:
-                                if isinstance(comp, ImageComponent):
-                                    url = comp.url or (
-                                        comp.file
-                                        if comp.file and comp.file.startswith("http")
-                                        else None
-                                    )
-                                    if url:
-                                        image_urls.append(url)
-                    except Exception:
-                        pass
-                    captions = []
-                    for url in image_urls:
-                        img_hash = await self.caption_cache.get_hash(url)
-                        cached = self.caption_cache.get(img_hash)
-                        if cached:
-                            captions.append(f"[图片描述: {cached}]")
-                    content = " ".join(captions) if captions else "[图片/表情]"
-                tracker.collected.append(
-                    {
-                        "user_name": "你",
-                        "user_id": "bot",
-                        "content": content,
-                        "image_urls": image_urls,
-                        "time": time.time(),
-                        "is_at_bot": False,
-                    }
-                )
-                tracker.detection_count = 0
-                tracker.expire_at = time.time() + self.config_helper.track_timeout()
-            else:
+            if not (tracker and tracker.alive):
                 await start_tracking(self, event, bot_text)
             return
 
@@ -217,10 +175,75 @@ class EchoPlugin(Star):
             return
         if self.tracker_manager.is_proactive_flagged(group_id):
             return
-        if self.config_helper.trigger_mode() != "any_message":
-            return
+
         bot_text = extract_sent_text(event)
-        await start_tracking(self, event, bot_text)
+        image_urls = []
+        try:
+            result = event.get_result()
+            if result and hasattr(result, "chain") and result.chain:
+                from astrbot.api.message_components import Image as ImageComponent
+
+                for comp in result.chain:
+                    if isinstance(comp, ImageComponent):
+                        url = comp.url or (
+                            comp.file
+                            if comp.file and comp.file.startswith("http")
+                            else None
+                        )
+                        if url:
+                            image_urls.append(url)
+        except Exception:
+            pass
+
+        tracker = self.tracker_manager.get_tracker(group_id)
+        if tracker and tracker.alive:
+            content = bot_text
+            if not content:
+                captions = []
+                for url in image_urls:
+                    img_hash = await self.caption_cache.get_hash(url)
+                    cached = self.caption_cache.get(img_hash)
+                    if cached:
+                        captions.append(f"[图片描述: {cached}]")
+                content = " ".join(captions) if captions else "[图片/表情]"
+
+            if not tracker.bot_message_sent:
+                tracker.bot_message_sent = True
+                tracker.bot_message = content
+                return
+
+            tracker.collected.append(
+                {
+                    "user_name": "你",
+                    "user_id": "bot",
+                    "content": content,
+                    "image_urls": image_urls,
+                    "time": time.time(),
+                    "is_at_bot": False,
+                }
+            )
+            tracker.detection_count = 0
+            tracker.expire_at = time.time() + self.config_helper.track_timeout()
+        else:
+            if (
+                self.tracker_manager.is_active_thinking(group_id)
+                or self.config_helper.trigger_mode() == "any_message"
+            ):
+                self.tracker_manager.set_active_thinking(group_id, False)
+                content = bot_text
+                if not content:
+                    captions = []
+                    for url in image_urls:
+                        img_hash = await self.caption_cache.get_hash(url)
+                        cached = self.caption_cache.get(img_hash)
+                        if cached:
+                            captions.append(f"[图片描述: {cached}]")
+                    content = " ".join(captions) if captions else "[图片/表情]"
+
+                await start_tracking(self, event, content)
+                new_tracker = self.tracker_manager.get_tracker(group_id)
+                if new_tracker:
+                    new_tracker.bot_message_sent = True
 
     @filter.command("bot在干嘛")
     async def cmd_bot_status(self, event: AstrMessageEvent):
