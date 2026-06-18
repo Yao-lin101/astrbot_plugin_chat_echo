@@ -13,7 +13,7 @@ def build_proactive_batch_context(plugin, umo: str, batch_size: int) -> tuple[st
     gcc = plugin.get_group_chat_context()
     if gcc:
         records = list(gcc.raw_records.get(umo, []))
-        relevant_records = records[-batch_size:] if records else []
+        relevant_records = records[-10:] if records else []
         for record in relevant_records:
             context_lines.append(record)
     context_text = "\n".join(context_lines)

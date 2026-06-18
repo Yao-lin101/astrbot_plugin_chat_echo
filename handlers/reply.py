@@ -4,7 +4,7 @@ from ..helpers import maybe_typing_delay
 from ..services.image_caption import ensure_context_captions
 from ..tracker import ConversationTracker
 
-MAX_CONTEXT_MESSAGES = 20
+MAX_CONTEXT_MESSAGES = 10
 
 
 def build_analyze_context(plugin, tracker: ConversationTracker) -> tuple[str, list[str]]:
@@ -12,35 +12,10 @@ def build_analyze_context(plugin, tracker: ConversationTracker) -> tuple[str, li
     lines = ["=== 群聊对话记录 (按时间顺序) ==="]
     idx = 1
     
-    # Prepend the trigger message if we have it
-    if tracker.trigger_message:
-        lines.append(f"{idx}. {tracker.trigger_user_name}: {tracker.trigger_message}")
-        idx += 1
-    
     gcc = plugin.get_group_chat_context()
     if gcc:
         records = list(gcc.raw_records.get(tracker.unified_msg_origin, []))
-        # Find the index of the last record starting with "[你/"
-        bot_idx = -1
-        for i in range(len(records) - 1, -1, -1):
-            if records[i].startswith("[你/"):
-                bot_idx = i
-                break
-        
-        if bot_idx != -1:
-            relevant_records = records[bot_idx:]
-        else:
-            if tracker.bot_message:
-                lines.append(f"{idx}. 你: {tracker.bot_message}")
-                idx += 1
-            relevant_records = records
-            
-        # Limit context messages
-        if len(relevant_records) > MAX_CONTEXT_MESSAGES:
-            skipped = len(relevant_records) - MAX_CONTEXT_MESSAGES
-            relevant_records = relevant_records[-MAX_CONTEXT_MESSAGES:]
-            lines.append(f"... (已省略中间 {skipped} 条消息)")
-            
+        relevant_records = records[-MAX_CONTEXT_MESSAGES:] if records else []
         for record in relevant_records:
             lines.append(f"{idx}. {record}")
             idx += 1
@@ -55,36 +30,10 @@ def build_batch_context(
     lines = ["=== 群聊对话记录 (批次分析, 按时间顺序) ==="]
     idx = 1
     
-    if tracker.trigger_message:
-        lines.append(f"{idx}. {tracker.trigger_user_name}: {tracker.trigger_message}")
-        idx += 1
-        
     gcc = plugin.get_group_chat_context()
     if gcc:
         records = list(gcc.raw_records.get(tracker.unified_msg_origin, []))
-        
-        batch_size = len(batch_messages)
-        relevant_records = records[-batch_size:] if records else []
-        
-        bot_idx = -1
-        cutoff = len(records) - batch_size
-        for i in range(cutoff - 1, -1, -1):
-            if records[i].startswith("[你/"):
-                bot_idx = i
-                break
-                
-        if bot_idx != -1:
-            relevant_records = records[bot_idx:]
-        else:
-            if tracker.bot_message:
-                lines.append(f"{idx}. 你: {tracker.bot_message}")
-                idx += 1
-                
-        if len(relevant_records) > MAX_CONTEXT_MESSAGES:
-            skipped = len(relevant_records) - MAX_CONTEXT_MESSAGES
-            relevant_records = relevant_records[-MAX_CONTEXT_MESSAGES:]
-            lines.append(f"... (已省略中间 {skipped} 条消息)")
-            
+        relevant_records = records[-MAX_CONTEXT_MESSAGES:] if records else []
         for record in relevant_records:
             lines.append(f"{idx}. {record}")
             idx += 1
