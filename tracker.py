@@ -80,6 +80,22 @@ class TrackerManager:
         self._last_schedule_check: dict[str, float] = {}
         # Proactive batch buffers (no ConversationTracker for proactive mode)
         self._proactive_buffers: dict[str, dict] = {}
+        # Rolling message history for LLM analysis context
+        self.group_histories: dict[str, any] = {}
+
+    def get_history(self, umo: str) -> list[str]:
+        """Get the rolling message history for a unified message origin."""
+        if umo not in self.group_histories:
+            from collections import deque
+            self.group_histories[umo] = deque(maxlen=10)
+        return list(self.group_histories[umo])
+
+    def add_to_history(self, umo: str, record: str) -> None:
+        """Add a formatted record to the rolling message history."""
+        if umo not in self.group_histories:
+            from collections import deque
+            self.group_histories[umo] = deque(maxlen=10)
+        self.group_histories[umo].append(record)
 
     def get_tracker(self, group_id: str) -> ConversationTracker | None:
         return self.trackers.get(group_id)

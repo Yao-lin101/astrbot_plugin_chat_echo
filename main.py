@@ -471,6 +471,7 @@ class EchoPlugin(Star):
         from collections import deque
         datetime_str = datetime.now().strftime("%H:%M:%S")
         final_message = f"[你/{datetime_str}]: {content}"
+        self.tracker_manager.add_to_history(umo, final_message)
         lock = gcc._get_lock(umo)
         async with lock:
             records = gcc.raw_records[umo]

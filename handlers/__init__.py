@@ -323,6 +323,11 @@ async def process_group_message(plugin, event: AstrMessageEvent) -> None:
     # History is tracked by native GroupChatContext
     if not is_bot:
         await post_process_group_context(plugin, event, image_urls)
+        gcc = plugin.get_group_chat_context()
+        if gcc:
+            records = gcc.raw_records.get(umo)
+            if records:
+                plugin.tracker_manager.add_to_history(umo, records[-1])
 
     if is_bot:
         return

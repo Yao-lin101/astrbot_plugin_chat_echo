@@ -12,7 +12,7 @@ def build_proactive_batch_context(plugin, umo: str, batch_size: int) -> tuple[st
     context_lines.append("[以下为本批次积累的消息，请综合判断是否应该参与讨论:]")
     gcc = plugin.get_group_chat_context()
     if gcc:
-        records = list(gcc.raw_records.get(umo, []))
+        records = plugin.tracker_manager.get_history(umo)
         relevant_records = records[-10:] if records else []
         for record in relevant_records:
             context_lines.append(record)
@@ -41,7 +41,7 @@ async def handle_proactive(
         all_image_urls = None
         gcc = plugin.get_group_chat_context()
         if gcc:
-            records = list(gcc.raw_records.get(event.unified_msg_origin, []))
+            records = plugin.tracker_manager.get_history(event.unified_msg_origin)
             for record in records[-10:]:
                 context_lines.append(record)
         context_text = "\n".join(context_lines)

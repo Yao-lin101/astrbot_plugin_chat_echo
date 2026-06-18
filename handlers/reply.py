@@ -14,7 +14,7 @@ def build_analyze_context(plugin, tracker: ConversationTracker) -> tuple[str, li
     
     gcc = plugin.get_group_chat_context()
     if gcc:
-        records = list(gcc.raw_records.get(tracker.unified_msg_origin, []))
+        records = plugin.tracker_manager.get_history(tracker.unified_msg_origin)
         relevant_records = records[-MAX_CONTEXT_MESSAGES:] if records else []
         for record in relevant_records:
             lines.append(f"{idx}. {record}")
@@ -32,7 +32,7 @@ def build_batch_context(
     
     gcc = plugin.get_group_chat_context()
     if gcc:
-        records = list(gcc.raw_records.get(tracker.unified_msg_origin, []))
+        records = plugin.tracker_manager.get_history(tracker.unified_msg_origin)
         relevant_records = records[-MAX_CONTEXT_MESSAGES:] if records else []
         for record in relevant_records:
             lines.append(f"{idx}. {record}")
