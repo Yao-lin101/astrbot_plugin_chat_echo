@@ -74,12 +74,123 @@ class EchoPlugin(Star):
         if chat_echo_triggered:
             self.tracker_manager.set_active_thinking(group_id, False)
             tracker = self.tracker_manager.get_tracker(group_id)
-            if not (tracker and tracker.alive):
-                await start_tracking(self, event, bot_text)
+            if tracker and tracker.alive:
+                content = bot_text
+                image_urls = []
+                if not content:
+                    try:
+                        result = event.get_result()
+                        if result and hasattr(result, "chain") and result.chain:
+                            from astrbot.api.message_components import (
+                                Image as ImageComponent,
+                            )
+
+                            for comp in result.chain:
+                                if isinstance(comp, ImageComponent):
+                                    url = comp.url or (
+                                        comp.file
+                                        if comp.file and comp.file.startswith("http")
+                                        else None
+                                    )
+                                    if url:
+                                        image_urls.append(url)
+                    except Exception:
+                        pass
+                    captions = []
+                    for url in image_urls:
+                        img_hash = await self.caption_cache.get_hash(url)
+                        cached = self.caption_cache.get(img_hash)
+                        if cached:
+                            captions.append(f"[图片描述: {cached}]")
+                    content = " ".join(captions) if captions else "[图片/表情]"
+
+                if not tracker.bot_message_sent:
+                    tracker.bot_message = content
+                else:
+                    tracker.collected.append(
+                        {
+                            "user_name": "你",
+                            "user_id": "bot",
+                            "content": content,
+                            "image_urls": image_urls,
+                            "time": time.time(),
+                            "is_at_bot": False,
+                        }
+                    )
+                tracker.last_llm_text = content
+                tracker.last_llm_time = time.time()
+                tracker.detection_count = 0
+                tracker.expire_at = time.time() + self.config_helper.track_timeout()
+            else:
+                content = bot_text
+                image_urls = []
+                if not content:
+                    try:
+                        result = event.get_result()
+                        if result and hasattr(result, "chain") and result.chain:
+                            from astrbot.api.message_components import (
+                                Image as ImageComponent,
+                            )
+
+                            for comp in result.chain:
+                                if isinstance(comp, ImageComponent):
+                                    url = comp.url or (
+                                        comp.file
+                                        if comp.file and comp.file.startswith("http")
+                                        else None
+                                    )
+                                    if url:
+                                        image_urls.append(url)
+                    except Exception:
+                        pass
+                    captions = []
+                    for url in image_urls:
+                        img_hash = await self.caption_cache.get_hash(url)
+                        cached = self.caption_cache.get(img_hash)
+                        if cached:
+                            captions.append(f"[图片描述: {cached}]")
+                    content = " ".join(captions) if captions else "[图片/表情]"
+                await start_tracking(self, event, content)
+                tracker = self.tracker_manager.get_tracker(group_id)
+                if tracker:
+                    tracker.last_llm_text = content
+                    tracker.last_llm_time = time.time()
             return
 
         if self.config_helper.trigger_mode() in ("llm_response", "any_message"):
-            await start_tracking(self, event, bot_text)
+            content = bot_text
+            image_urls = []
+            if not content:
+                try:
+                    result = event.get_result()
+                    if result and hasattr(result, "chain") and result.chain:
+                        from astrbot.api.message_components import (
+                            Image as ImageComponent,
+                        )
+
+                        for comp in result.chain:
+                            if isinstance(comp, ImageComponent):
+                                url = comp.url or (
+                                    comp.file
+                                    if comp.file and comp.file.startswith("http")
+                                    else None
+                                )
+                                if url:
+                                    image_urls.append(url)
+                except Exception:
+                    pass
+                captions = []
+                for url in image_urls:
+                    img_hash = await self.caption_cache.get_hash(url)
+                    cached = self.caption_cache.get(img_hash)
+                    if cached:
+                        captions.append(f"[图片描述: {cached}]")
+                content = " ".join(captions) if captions else "[图片/表情]"
+            await start_tracking(self, event, content)
+            tracker = self.tracker_manager.get_tracker(group_id)
+            if tracker:
+                tracker.last_llm_text = content
+                tracker.last_llm_time = time.time()
 
     @filter.on_llm_request()
     async def on_llm_request(
@@ -195,17 +306,40 @@ class EchoPlugin(Star):
         except Exception:
             pass
 
+        content = bot_text
+        if not content:
+            captions = []
+            for url in image_urls:
+                img_hash = await self.caption_cache.get_hash(url)
+                cached = self.caption_cache.get(img_hash)
+                if cached:
+                    captions.append(f"[图片描述: {cached}]")
+            content = " ".join(captions) if captions else "[图片/表情]"
+
         tracker = self.tracker_manager.get_tracker(group_id)
         if tracker and tracker.alive:
-            content = bot_text
-            if not content:
-                captions = []
-                for url in image_urls:
-                    img_hash = await self.caption_cache.get_hash(url)
-                    cached = self.caption_cache.get(img_hash)
-                    if cached:
-                        captions.append(f"[图片描述: {cached}]")
-                content = " ".join(captions) if captions else "[图片/表情]"
+            # Check if this sent message content matches the whole or a split segment of the last LLM response text
+            # within a 5-second window. If so, skip it as it's already recorded in full by on_llm_response.
+            is_llm_part = False
+            if tracker.last_llm_text and (time.time() - tracker.last_llm_time < 5.0):
+                clean_content = content.strip()
+                if clean_content:
+                    llm_parts = [
+                        p.strip()
+                        for p in tracker.last_llm_text.split("\n")
+                        if p.strip()
+                    ]
+                    if (
+                        clean_content == tracker.last_llm_text.strip()
+                        or clean_content in llm_parts
+                    ):
+                        is_llm_part = True
+                else:
+                    is_llm_part = True
+
+            if is_llm_part:
+                tracker.bot_message_sent = True
+                return
 
             if not tracker.bot_message_sent:
                 tracker.bot_message_sent = True
@@ -230,16 +364,6 @@ class EchoPlugin(Star):
                 or self.config_helper.trigger_mode() == "any_message"
             ):
                 self.tracker_manager.set_active_thinking(group_id, False)
-                content = bot_text
-                if not content:
-                    captions = []
-                    for url in image_urls:
-                        img_hash = await self.caption_cache.get_hash(url)
-                        cached = self.caption_cache.get(img_hash)
-                        if cached:
-                            captions.append(f"[图片描述: {cached}]")
-                    content = " ".join(captions) if captions else "[图片/表情]"
-
                 await start_tracking(self, event, content)
                 new_tracker = self.tracker_manager.get_tracker(group_id)
                 if new_tracker:
