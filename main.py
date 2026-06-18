@@ -75,12 +75,41 @@ class EchoPlugin(Star):
             self.tracker_manager.set_active_thinking(group_id, False)
             tracker = self.tracker_manager.get_tracker(group_id)
             if tracker and tracker.alive:
+                # When bot_text is empty (e.g. image-only reply), try caption cache
+                content = bot_text
+                image_urls = []
+                if not content:
+                    try:
+                        result = event.get_result()
+                        if result and hasattr(result, "chain") and result.chain:
+                            from astrbot.api.message_components import (
+                                Image as ImageComponent,
+                            )
+
+                            for comp in result.chain:
+                                if isinstance(comp, ImageComponent):
+                                    url = comp.url or (
+                                        comp.file
+                                        if comp.file and comp.file.startswith("http")
+                                        else None
+                                    )
+                                    if url:
+                                        image_urls.append(url)
+                    except Exception:
+                        pass
+                    captions = []
+                    for url in image_urls:
+                        img_hash = await self.caption_cache.get_hash(url)
+                        cached = self.caption_cache.get(img_hash)
+                        if cached:
+                            captions.append(f"[图片描述: {cached}]")
+                    content = " ".join(captions) if captions else "[图片/表情]"
                 tracker.collected.append(
                     {
                         "user_name": "你",
                         "user_id": "bot",
-                        "content": bot_text or "[图片/表情]",
-                        "image_urls": [],
+                        "content": content,
+                        "image_urls": image_urls,
                         "time": time.time(),
                         "is_at_bot": False,
                     }

@@ -21,10 +21,9 @@ def build_analyze_context(tracker: ConversationTracker) -> tuple[str, list[str]]
     collected = tracker.collected
     all_image_urls = []
     if len(collected) > MAX_CONTEXT_MESSAGES:
+        skipped = len(collected) - MAX_CONTEXT_MESSAGES
         collected = collected[-MAX_CONTEXT_MESSAGES:]
-        lines.append(
-            f"... (已省略较早的消息，以下为最近 {MAX_CONTEXT_MESSAGES} 条，共 {len(tracker.collected)} 条)"
-        )
+        lines.append(f"... (已省略中间 {skipped} 条消息)")
     for msg in collected:
         if not msg.get("content", "").strip():
             continue
@@ -49,15 +48,11 @@ def build_batch_context(
     idx += 1
 
     all_image_urls = []
-
-    # Mark batch messages explicitly
-    lines.append("[以下为本批次积累的消息，请综合判断是否在回复你:]")
     batch = batch_messages
     if len(batch) > MAX_CONTEXT_MESSAGES:
+        skipped = len(batch) - MAX_CONTEXT_MESSAGES
         batch = batch[-MAX_CONTEXT_MESSAGES:]
-        lines.append(
-            f"... (已省略较早的消息，以下为最近 {MAX_CONTEXT_MESSAGES} 条，本批次共 {len(batch_messages)} 条)"
-        )
+        lines.append(f"... (已省略中间 {skipped} 条消息)")
     for msg in batch:
         if not msg.get("content", "").strip():
             continue
